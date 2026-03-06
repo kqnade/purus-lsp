@@ -14,7 +14,7 @@ interface LintDiagnostic {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { check } = require("purus");
+const { compile } = require("purus");
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { lint } = require("@puruslang/linter");
 
@@ -32,16 +32,16 @@ function lintSeverityToLSP(severity: string): DiagnosticSeverity {
 export function getDiagnostics(source: string): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
-  // 1. Compile check (purus check)
+  // 1. Compile check (purus build — detects more errors than purus check)
   try {
-    check(source);
+    compile(source);
   } catch (e: unknown) {
-    const message =
-      e instanceof Error ? e.message : String(e);
+    const err = e as { stderr?: string; message?: string };
+    const raw = err.stderr?.trim() || (e instanceof Error ? e.message : String(e));
     diagnostics.push({
       severity: DiagnosticSeverity.Error,
       range: Range.create(Position.create(0, 0), Position.create(0, 0)),
-      message: message.replace(/^Syntax error:\s*/, ""),
+      message: raw.replace(/^Syntax error:\s*/, "").trim(),
       source: "purus",
     });
   }
