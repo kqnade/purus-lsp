@@ -378,7 +378,7 @@ class Lexer {
 
     // Read flags
     let flags = "";
-    while (this.pos < this.source.length && /[dgimsuvy]/.test(this.source[this.pos])) {
+    while (this.pos < this.source.length && /[gimsuy]/.test(this.source[this.pos])) {
       flags += this.source[this.pos];
       this.advance();
     }
