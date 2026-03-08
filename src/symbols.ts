@@ -111,10 +111,14 @@ export function getAllSymbols(scope: Scope): PurusSymbol[] {
 
 export function getSymbolsInScope(scope: Scope): PurusSymbol[] {
   const symbols: PurusSymbol[] = [];
+  const seen = new Set<string>();
   let current: Scope | null = scope;
   while (current) {
     for (const sym of current.symbols.values()) {
-      symbols.push(sym);
+      if (!seen.has(sym.name)) {
+        seen.add(sym.name);
+        symbols.push(sym);
+      }
     }
     current = current.parent;
   }
