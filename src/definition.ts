@@ -1,5 +1,5 @@
 import { Location, Position, Range } from "vscode-languageserver/node";
-import { Scope, findScopeAtPosition, lookupSymbol } from "./symbols";
+import { Scope, findSymbolAtPosition, findScopeAtPosition, lookupSymbol } from "./symbols";
 import { Token, TokenKind } from "./token";
 import { Span } from "./token";
 import { findIdentifierAtPosition } from "./token-utils";
@@ -12,12 +12,15 @@ export function getDefinition(
   source: string,
   tokens: Token[]
 ): Location | null {
-  const word = findIdentifierAtPosition(tokens, source, line, col);
-  if (!word) return null;
-
-  const scope = findScopeAtPosition(rootScope, line, col);
-  const sym = lookupSymbol(scope, word);
-  if (!sym) return null;
+  const sym = findSymbolAtPosition(rootScope, line, col);
+  if (!sym) {
+    const word = findIdentifierAtPosition(tokens, source, line, col);
+    if (!word) return null;
+    const scope = findScopeAtPosition(rootScope, line, col);
+    const fallback = lookupSymbol(scope, word);
+    if (!fallback) return null;
+    return { uri, range: spanToRange(fallback.nameSpan) };
+  }
 
   return {
     uri,

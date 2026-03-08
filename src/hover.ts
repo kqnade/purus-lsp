@@ -1,5 +1,5 @@
 import { Hover, MarkupKind } from "vscode-languageserver/node";
-import { Scope, findScopeAtPosition, lookupSymbol, SymbolKind } from "./symbols";
+import { Scope, findSymbolAtPosition, findScopeAtPosition, lookupSymbol, SymbolKind } from "./symbols";
 import { Token, TokenKind } from "./token";
 import { getKeywordInfo } from "./keywords";
 import { findIdentifierAtPosition } from "./token-utils";
@@ -25,13 +25,15 @@ export function getHoverInfo(
     }
   }
 
-  // Look up user-defined symbol (only if cursor is on an identifier token)
-  const word = findIdentifierAtPosition(tokens, source, line, col);
-  if (!word) return null;
-
-  const scope = findScopeAtPosition(rootScope, line, col);
-  const sym = lookupSymbol(scope, word);
-  if (!sym) return null;
+  // Look up user-defined symbol (position-based, then name-based fallback)
+  let sym = findSymbolAtPosition(rootScope, line, col);
+  if (!sym) {
+    const word = findIdentifierAtPosition(tokens, source, line, col);
+    if (!word) return null;
+    const scope = findScopeAtPosition(rootScope, line, col);
+    sym = lookupSymbol(scope, word);
+    if (!sym) return null;
+  }
 
   let markdown = "";
 

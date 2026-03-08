@@ -1,5 +1,5 @@
 import { Location, Position, Range } from "vscode-languageserver/node";
-import { Scope, findScopeAtPosition, lookupSymbol } from "./symbols";
+import { Scope, findSymbolAtPosition, findScopeAtPosition, lookupSymbol } from "./symbols";
 import { Token } from "./token";
 import { Span } from "./token";
 import { findIdentifierAtPosition } from "./token-utils";
@@ -13,12 +13,14 @@ export function getReferences(
   includeDeclaration: boolean,
   tokens: Token[]
 ): Location[] {
-  const word = findIdentifierAtPosition(tokens, source, line, col);
-  if (!word) return [];
-
-  const scope = findScopeAtPosition(rootScope, line, col);
-  const sym = lookupSymbol(scope, word);
-  if (!sym) return [];
+  let sym = findSymbolAtPosition(rootScope, line, col);
+  if (!sym) {
+    const word = findIdentifierAtPosition(tokens, source, line, col);
+    if (!word) return [];
+    const scope = findScopeAtPosition(rootScope, line, col);
+    sym = lookupSymbol(scope, word);
+    if (!sym) return [];
+  }
 
   const locations: Location[] = [];
 
