@@ -1,7 +1,7 @@
 import { Token, TokenKind, Span, Position } from "./token";
 import {
   Program, Stmt, Expr, Param, FnBody, MatchArm, MatchArmBody,
-  ClassMember, ObjectEntry, BinaryOp, PostfixModifier,
+  ClassMember, ObjectEntry, BinaryOp, PostfixModifier, ImportAttribute,
 } from "./ast";
 
 export interface ParseError {
@@ -628,7 +628,8 @@ class Parser {
     // Side-effect import: import ///path///
     if (this.check(TokenKind.Str)) {
       const source = this.advance().value as string;
-      return { type: "SideEffectImport", source, span: this.spanFrom(start) };
+      const attributes = this.parseImportAttributes();
+      return { type: "SideEffectImport", source, attributes, span: this.spanFrom(start) };
     }
 
     // import all as name from ///path///
@@ -638,11 +639,13 @@ class Parser {
       const nameToken = this.expect(TokenKind.Ident, "Expected identifier");
       this.expect(TokenKind.From, "Expected 'from'");
       const source = this.expect(TokenKind.Str, "Expected string").value as string;
+      const attributes = this.parseImportAttributes();
       return {
         type: "Import",
         namespaceName: nameToken.text,
         namespaceNameSpan: nameToken.span,
         source,
+        attributes,
         span: this.spanFrom(start),
       };
     }
@@ -654,10 +657,12 @@ class Parser {
       this.expect(TokenKind.RBracket, "Expected ']'");
       this.expect(TokenKind.From, "Expected 'from'");
       const source = this.expect(TokenKind.Str, "Expected string").value as string;
+      const attributes = this.parseImportAttributes();
       return {
         type: "Import",
         names,
         source,
+        attributes,
         span: this.spanFrom(start),
       };
     }
@@ -675,6 +680,7 @@ class Parser {
 
     this.expect(TokenKind.From, "Expected 'from'");
     const source = this.expect(TokenKind.Str, "Expected string").value as string;
+    const attributes = this.parseImportAttributes();
 
     return {
       type: "Import",
@@ -682,8 +688,29 @@ class Parser {
       defaultNameSpan: defaultNameToken.span,
       names,
       source,
+      attributes,
       span: this.spanFrom(start),
     };
+  }
+
+  private parseImportAttributes(): ImportAttribute[] | undefined {
+    if (!this.check(TokenKind.With)) return undefined;
+    this.advance(); // with
+    this.expect(TokenKind.LBracket, "Expected '['");
+    const attrs: ImportAttribute[] = [];
+    while (!this.check(TokenKind.RBracket) && !this.check(TokenKind.Eof)) {
+      const attrStart = this.peek().span.start;
+      const keyToken = this.expect(TokenKind.Ident, "Expected attribute key");
+      this.expect(TokenKind.Be, "Expected 'be'");
+      const valueToken = this.expect(TokenKind.Str, "Expected string value");
+      attrs.push({
+        key: keyToken.text,
+        value: valueToken.value as string,
+        span: this.spanFrom(attrStart),
+      });
+    }
+    this.expect(TokenKind.RBracket, "Expected ']'");
+    return attrs.length > 0 ? attrs : undefined;
   }
 
   private parseUse(): Stmt {
@@ -1375,6 +1402,10 @@ class Parser {
       case TokenKind.Undefined: {
         this.advance();
         return { type: "UndefinedLit", span: token.span };
+      }
+      case TokenKind.Nan: {
+        this.advance();
+        return { type: "NanLit", span: token.span };
       }
       case TokenKind.This: {
         this.advance();

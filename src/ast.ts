@@ -255,6 +255,12 @@ export interface ContinueStmt {
   span: Span;
 }
 
+export interface ImportAttribute {
+  key: string;
+  value: string;
+  span: Span;
+}
+
 export interface ImportStmt {
   type: "Import";
   defaultName?: string;
@@ -263,12 +269,14 @@ export interface ImportStmt {
   namespaceName?: string;
   namespaceNameSpan?: Span;
   source: string;
+  attributes?: ImportAttribute[];
   span: Span;
 }
 
 export interface SideEffectImportStmt {
   type: "SideEffectImport";
   source: string;
+  attributes?: ImportAttribute[];
   span: Span;
 }
 
@@ -348,6 +356,7 @@ export type Expr =
   | BoolLitExpr
   | NullLitExpr
   | UndefinedLitExpr
+  | NanLitExpr
   | IdentExpr
   | ThisExpr
   | SuperExpr
@@ -415,6 +424,11 @@ export interface NullLitExpr {
 
 export interface UndefinedLitExpr {
   type: "UndefinedLit";
+  span: Span;
+}
+
+export interface NanLitExpr {
+  type: "NanLit";
   span: Span;
 }
 

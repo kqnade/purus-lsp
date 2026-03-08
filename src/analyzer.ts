@@ -447,6 +447,7 @@ class Analyzer {
       case "BoolLit":
       case "NullLit":
       case "UndefinedLit":
+      case "NanLit":
       case "This":
       case "Super":
         break;
