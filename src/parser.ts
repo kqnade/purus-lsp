@@ -1284,7 +1284,6 @@ class Parser {
 
       // Function call or computed access: expr[...]
       if (this.check(TokenKind.LBracket)) {
-        const saved = this.pos;
         this.advance(); // [
 
         // Computed access: expr[\index] or expr[\start..end]
@@ -1800,28 +1799,30 @@ class Parser {
   }
 
   private maybePostfix(stmt: Stmt): Stmt {
-    if (this.check(TokenKind.If) && stmt.type === "ExprStmt") {
+    if (stmt.type !== "ExprStmt") return stmt;
+    const exprStmt = stmt;
+    if (this.check(TokenKind.If)) {
       this.advance();
       const condition = this.parseExpression();
-      (stmt as any).postfix = { kind: "if", condition } as PostfixModifier;
-      (stmt as any).span = this.mergeSpans(stmt.span, condition.span);
-      return stmt;
+      exprStmt.postfix = { kind: "if", condition };
+      exprStmt.span = this.mergeSpans(exprStmt.span, condition.span);
+      return exprStmt;
     }
-    if (this.check(TokenKind.Unless) && stmt.type === "ExprStmt") {
+    if (this.check(TokenKind.Unless)) {
       this.advance();
       const condition = this.parseExpression();
-      (stmt as any).postfix = { kind: "unless", condition } as PostfixModifier;
-      (stmt as any).span = this.mergeSpans(stmt.span, condition.span);
-      return stmt;
+      exprStmt.postfix = { kind: "unless", condition };
+      exprStmt.span = this.mergeSpans(exprStmt.span, condition.span);
+      return exprStmt;
     }
-    if (this.check(TokenKind.For) && stmt.type === "ExprStmt") {
+    if (this.check(TokenKind.For)) {
       this.advance();
       const variable = this.expect(TokenKind.Ident, "Expected variable").text;
       this.expect(TokenKind.In, "Expected 'in'");
       const iterable = this.parseExpression();
-      (stmt as any).postfix = { kind: "for", variable, iterable } as PostfixModifier;
-      (stmt as any).span = this.mergeSpans(stmt.span, iterable.span);
-      return stmt;
+      exprStmt.postfix = { kind: "for", variable, iterable };
+      exprStmt.span = this.mergeSpans(exprStmt.span, iterable.span);
+      return exprStmt;
     }
     return stmt;
   }
@@ -1858,7 +1859,7 @@ class Parser {
     this.addError(message + `, got '${this.peek().text}'`);
     // Return a dummy token
     const span = this.currentSpan();
-    return { kind, text: "", span };
+    return { kind, text: "", value: "", span };
   }
 
   private isAtEnd(): boolean {
