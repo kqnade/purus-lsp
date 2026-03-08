@@ -117,11 +117,13 @@ export enum TokenKind {
   Namespace,
   Pub,
   All,
+  With,
 
   // Null family
   Null,
   Nil,
   Undefined,
+  Nan,
 
   // Collection
   List,
@@ -231,11 +233,13 @@ export const KEYWORDS: ReadonlyMap<string, TokenKind> = new Map([
   ["namespace", TokenKind.Namespace],
   ["pub", TokenKind.Pub],
   ["all", TokenKind.All],
+  ["with", TokenKind.With],
   ["true", TokenKind.True],
   ["false", TokenKind.False],
   ["null", TokenKind.Null],
   ["nil", TokenKind.Nil],
   ["undefined", TokenKind.Undefined],
+  ["nan", TokenKind.Nan],
   ["list", TokenKind.List],
   ["object", TokenKind.Object],
 ]);
