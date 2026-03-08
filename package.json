@@ -1,6 +1,6 @@
 {
   "name": "purus-lsp",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Language Server for the Purus programming language",
   "main": "dist/server.js",
   "bin": {

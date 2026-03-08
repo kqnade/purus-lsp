@@ -46,6 +46,7 @@ const keywords: KeywordInfo[] = [
   { label: "or", detail: "|| (logical OR)", documentation: "論理和。`a or b` → `a || b`", kind: CompletionItemKind.Operator },
   { label: "not", detail: "! (logical NOT)", documentation: "論理否定。`not x` → `!x`", kind: CompletionItemKind.Operator },
   { label: "pipe", detail: "| (pipe operator)", documentation: "パイプ演算子。左の値を右の関数に渡す。`x pipe f` → `f(x)`", kind: CompletionItemKind.Operator },
+  { label: "coal", detail: "?? (nullish coalescing)", documentation: "Null 合体演算子。`a coal b` → `a ?? b`", kind: CompletionItemKind.Operator },
 
   // Conditionals
   { label: "if", detail: "if", documentation: "条件分岐。後置形式も可: `stmt if cond`", kind: CompletionItemKind.Keyword },
@@ -83,6 +84,7 @@ const keywords: KeywordInfo[] = [
   { label: "namespace", detail: "namespace (IIFE)", documentation: "名前空間を宣言。IIFE にコンパイルされる。`namespace mymod` → `const mymod = (() => { ... })()`", kind: CompletionItemKind.Keyword },
   { label: "pub", detail: "export (public)", documentation: "宣言を公開/エクスポートする。`pub fn name` → `export function name`", kind: CompletionItemKind.Keyword },
   { label: "all", detail: "* as (namespace import)", documentation: "名前空間インポート。`import all as ns from ///path///`", kind: CompletionItemKind.Keyword },
+  { label: "with", detail: "import attributes", documentation: "インポート属性。`import data from ///data.json/// with [ type be ///json/// ]`", kind: CompletionItemKind.Keyword },
 
   // Type System
   { label: "is", detail: "typeof/instanceof", documentation: "型チェック。`x is string` → `typeof x === \"string\"`. `x is MyClass` → `x instanceof MyClass`", kind: CompletionItemKind.Operator },
@@ -98,12 +100,22 @@ const keywords: KeywordInfo[] = [
   { label: "null", detail: "null", documentation: "null リテラル", kind: CompletionItemKind.Value },
   { label: "nil", detail: "null (alias)", documentation: "null のエイリアス（`null` の使用を推奨）", kind: CompletionItemKind.Value },
   { label: "undefined", detail: "undefined", documentation: "undefined リテラル", kind: CompletionItemKind.Value },
+  { label: "nan", detail: "NaN", documentation: "NaN リテラル。`nan` → `NaN`", kind: CompletionItemKind.Value },
 
   // OOP / Reference
   { label: "new", detail: "new", documentation: "インスタンスを生成。`new Foo[args]` → `new Foo(args)`", kind: CompletionItemKind.Keyword },
   { label: "delete", detail: "delete", documentation: "プロパティを削除。`delete obj.key` → `delete obj.key`", kind: CompletionItemKind.Keyword },
   { label: "this", detail: "this", documentation: "現在のオブジェクトへの参照", kind: CompletionItemKind.Keyword },
   { label: "await", detail: "await", documentation: "async fn 内で Promise を待機する", kind: CompletionItemKind.Keyword },
+
+  // Class
+  { label: "class", detail: "class", documentation: "クラスを宣言する。`class Name` → `class Name { ... }`", kind: CompletionItemKind.Keyword },
+  { label: "extends", detail: "extends", documentation: "クラスの継承。`class Dog extends Animal` → `class Dog extends Animal`", kind: CompletionItemKind.Keyword },
+  { label: "super", detail: "super", documentation: "親クラスのコンストラクタ/メソッドを呼び出す。`super[args]` → `super(args)`", kind: CompletionItemKind.Keyword },
+  { label: "static", detail: "static", documentation: "静的メソッドを宣言。`static fn name` → `static name() { ... }`", kind: CompletionItemKind.Keyword },
+  { label: "private", detail: "# (private field)", documentation: "プライベートフィールドを宣言。`private name` → `#name`", kind: CompletionItemKind.Keyword },
+  { label: "get", detail: "get (accessor)", documentation: "ゲッターアクセサ。`get fn name to expr` → `get name() { return expr; }`", kind: CompletionItemKind.Keyword },
+  { label: "set", detail: "set (accessor)", documentation: "セッターアクセサ。`set fn name value` → `set name(value) { ... }`", kind: CompletionItemKind.Keyword },
 
   // Collection Literals
   { label: "list", detail: "[...] (array)", documentation: "配列リテラル。`list [a, b, c]` → `[a, b, c]`", kind: CompletionItemKind.Keyword },
