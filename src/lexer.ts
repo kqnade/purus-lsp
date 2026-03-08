@@ -212,7 +212,8 @@ class Lexer {
       }
     }
     // Skip empty/comment-only lines
-    if (this.pos < this.source.length && this.source[this.pos] !== "\n" && this.source[this.pos] !== "\r") {
+    if (this.pos < this.source.length && this.source[this.pos] !== "\n" && this.source[this.pos] !== "\r" &&
+        !this.match("--")) {
       if (spaces > 0) {
         const token: Token = {
           kind: TokenKind.Indent,
