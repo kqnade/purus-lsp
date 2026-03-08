@@ -101,6 +101,7 @@ function mapToken(token: Token, rootScope: Scope): [TokenTypeIndex, TokenModifie
     case TokenKind.Namespace:
     case TokenKind.Pub:
     case TokenKind.All:
+    case TokenKind.With:
     case TokenKind.Async:
     case TokenKind.Await:
     case TokenKind.New:
@@ -159,6 +160,7 @@ function mapToken(token: Token, rootScope: Scope): [TokenTypeIndex, TokenModifie
     case TokenKind.Null:
     case TokenKind.Nil:
     case TokenKind.Undefined:
+    case TokenKind.Nan:
       return [typeIndex["enumMember"], 0];
 
     // Comments
