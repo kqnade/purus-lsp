@@ -71,7 +71,7 @@ export function findScopeAtPosition(scope: Scope, line: number, col: number): Sc
 export function isPositionInSpan(line: number, col: number, span: Span): boolean {
   if (line < span.start.line || line > span.end.line) return false;
   if (line === span.start.line && col < span.start.column) return false;
-  if (line === span.end.line && col > span.end.column) return false;
+  if (line === span.end.line && col >= span.end.column) return false;
   return true;
 }
 

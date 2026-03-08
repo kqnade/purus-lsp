@@ -1,15 +1,18 @@
 import { Location, Position, Range } from "vscode-languageserver/node";
 import { Scope, findScopeAtPosition, lookupSymbol } from "./symbols";
+import { Token, TokenKind } from "./token";
 import { Span } from "./token";
+import { findIdentifierAtPosition } from "./token-utils";
 
 export function getDefinition(
   rootScope: Scope,
   uri: string,
   line: number,
   col: number,
-  source: string
+  source: string,
+  tokens: Token[]
 ): Location | null {
-  const word = extractWordAtPosition(source, line, col);
+  const word = findIdentifierAtPosition(tokens, source, line, col);
   if (!word) return null;
 
   const scope = findScopeAtPosition(rootScope, line, col);
@@ -20,30 +23,6 @@ export function getDefinition(
     uri,
     range: spanToRange(sym.nameSpan),
   };
-}
-
-function extractWordAtPosition(source: string, line: number, col: number): string | null {
-  const lines = source.split("\n");
-  if (line >= lines.length) return null;
-
-  const lineText = lines[line];
-  if (col >= lineText.length) return null;
-
-  // Find word boundaries (support hyphens in identifiers)
-  let start = col;
-  while (start > 0 && /[a-zA-Z0-9_-]/.test(lineText[start - 1])) {
-    start--;
-  }
-
-  let end = col;
-  while (end < lineText.length && /[a-zA-Z0-9_-]/.test(lineText[end])) {
-    end++;
-  }
-
-  const word = lineText.slice(start, end);
-  if (!word || !/^[a-zA-Z_]/.test(word)) return null;
-
-  return word;
 }
 
 function spanToRange(span: Span): Range {

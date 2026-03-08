@@ -21,17 +21,19 @@ export function getCompletions(
     return [];
   }
 
-  // Get in-scope symbols
-  const scope = findScopeAtPosition(rootScope, line, col);
-  const symbols = getSymbolsInScope(scope);
+  // Get in-scope symbols (skip when after a dot - member access)
+  if (context !== "member") {
+    const scope = findScopeAtPosition(rootScope, line, col);
+    const symbols = getSymbolsInScope(scope);
 
-  for (const sym of symbols) {
-    items.push({
-      label: sym.name,
-      kind: symbolKindToCompletionKind(sym.kind),
-      detail: sym.detail,
-      data: `sym:${sym.name}`,
-    });
+    for (const sym of symbols) {
+      items.push({
+        label: sym.name,
+        kind: symbolKindToCompletionKind(sym.kind),
+        detail: sym.detail,
+        data: `sym:${sym.name}`,
+      });
+    }
   }
 
   // Add keyword completions

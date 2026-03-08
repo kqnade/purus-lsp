@@ -556,8 +556,7 @@ class Lexer {
   private lastNonTriviaToken(): Token | undefined {
     for (let i = this.tokens.length - 1; i >= 0; i--) {
       const t = this.tokens[i];
-      if (t.kind !== TokenKind.Comment && t.kind !== TokenKind.BlockComment &&
-          t.kind !== TokenKind.Newline && t.kind !== TokenKind.Indent) {
+      if (t.kind !== TokenKind.Comment && t.kind !== TokenKind.BlockComment) {
         return t;
       }
     }

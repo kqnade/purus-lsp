@@ -1,28 +1,34 @@
 import { Hover, MarkupKind } from "vscode-languageserver/node";
 import { Scope, findScopeAtPosition, lookupSymbol, SymbolKind } from "./symbols";
+import { Token, TokenKind } from "./token";
 import { getKeywordInfo } from "./keywords";
+import { findIdentifierAtPosition } from "./token-utils";
 
 export function getHoverInfo(
   rootScope: Scope,
   source: string,
   line: number,
-  col: number
+  col: number,
+  tokens: Token[]
 ): Hover | null {
-  const word = extractWordAtPosition(source, line, col);
-  if (!word) return null;
-
-  // Check keyword first
-  const kwInfo = getKeywordInfo(word);
-  if (kwInfo) {
-    return {
-      contents: {
-        kind: MarkupKind.Markdown,
-        value: `**\`${kwInfo.label}\`** — ${kwInfo.detail}\n\n${kwInfo.documentation}`,
-      },
-    };
+  // Check keyword by finding the token at position (keywords are also tokens)
+  const kwWord = findKeywordOrIdentAtPosition(tokens, line, col);
+  if (kwWord) {
+    const kwInfo = getKeywordInfo(kwWord);
+    if (kwInfo) {
+      return {
+        contents: {
+          kind: MarkupKind.Markdown,
+          value: `**\`${kwInfo.label}\`** — ${kwInfo.detail}\n\n${kwInfo.documentation}`,
+        },
+      };
+    }
   }
 
-  // Look up user-defined symbol
+  // Look up user-defined symbol (only if cursor is on an identifier token)
+  const word = findIdentifierAtPosition(tokens, source, line, col);
+  if (!word) return null;
+
   const scope = findScopeAtPosition(rootScope, line, col);
   const sym = lookupSymbol(scope, word);
   if (!sym) return null;
@@ -92,24 +98,19 @@ export function getHoverInfo(
   };
 }
 
-function extractWordAtPosition(source: string, line: number, col: number): string | null {
-  const lines = source.split("\n");
-  if (line >= lines.length) return null;
-
-  const lineText = lines[line];
-
-  let start = col;
-  while (start > 0 && /[a-zA-Z0-9_-]/.test(lineText[start - 1])) {
-    start--;
+function findKeywordOrIdentAtPosition(tokens: Token[], line: number, col: number): string | null {
+  for (const t of tokens) {
+    if (t.kind === TokenKind.Ident ||
+        t.kind === TokenKind.Comment || t.kind === TokenKind.BlockComment ||
+        t.kind === TokenKind.Str) {
+      // Skip non-keyword tokens for keyword lookup, but allow Ident
+      if (t.kind !== TokenKind.Ident) continue;
+    }
+    const s = t.span;
+    if (s.start.line > line || s.end.line < line) continue;
+    if (s.start.line === line && col < s.start.column) continue;
+    if (s.end.line === line && col >= s.end.column) continue;
+    return t.text;
   }
-
-  let end = col;
-  while (end < lineText.length && /[a-zA-Z0-9_-]/.test(lineText[end])) {
-    end++;
-  }
-
-  const word = lineText.slice(start, end);
-  if (!word || !/^[a-zA-Z_]/.test(word)) return null;
-
-  return word;
+  return null;
 }

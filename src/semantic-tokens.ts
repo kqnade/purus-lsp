@@ -46,8 +46,11 @@ export function computeSemanticTokens(tokens: Token[], rootScope: Scope): number
     const [tokenType, tokenMods] = mapped;
     const line = token.span.start.line;
     const col = token.span.start.column;
-    const length = token.span.end.offset - token.span.start.offset;
 
+    // Skip multi-line tokens (LSP requires single-line unless multilineTokenSupport is declared)
+    if (token.span.end.line !== token.span.start.line) continue;
+
+    const length = token.span.end.column - token.span.start.column;
     if (length <= 0) continue;
 
     const deltaLine = line - prevLine;

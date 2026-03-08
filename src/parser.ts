@@ -1,4 +1,4 @@
-import { Token, TokenKind, Span } from "./token";
+import { Token, TokenKind, Span, Position } from "./token";
 import {
   Program, Stmt, Expr, Param, FnBody, MatchArm, MatchArmBody,
   ClassMember, ObjectEntry, BinaryOp, PostfixModifier,
@@ -164,7 +164,7 @@ class Parser {
     return this.maybePostfix(stmt);
   }
 
-  private parseArrayDestruct(declKind: "const" | "let" | "var", start: any): Stmt {
+  private parseArrayDestruct(declKind: "const" | "let" | "var", start: Position): Stmt {
     this.advance(); // [
     const names = this.parseIdentList();
     this.expect(TokenKind.RBracket, "Expected ']'");
@@ -179,7 +179,7 @@ class Parser {
     };
   }
 
-  private parseObjectDestruct(declKind: "const" | "let" | "var", start: any): Stmt {
+  private parseObjectDestruct(declKind: "const" | "let" | "var", start: Position): Stmt {
     this.advance(); // object
     this.expect(TokenKind.LBracket, "Expected '['");
     const names = this.parseIdentList();
@@ -330,8 +330,6 @@ class Parser {
       this.skipNewlines();
       if (this.isAtEnd()) break;
 
-      // Check indent
-      const indent = this.getIndentLevel();
       if (this.check(TokenKind.Indent)) {
         const indentVal = this.peek().value as number;
         if (indentVal > this.currentIndent) break;
@@ -1858,7 +1856,7 @@ class Parser {
     return { start: pos, end: pos };
   }
 
-  private spanFrom(start: any): Span {
+  private spanFrom(start: Position): Span {
     const end = this.pos > 0 ? this.tokens[this.pos - 1].span.end : start;
     return { start, end };
   }

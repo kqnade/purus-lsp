@@ -26,7 +26,7 @@ class Analyzer {
       case "VarDecl":
         this.declareSymbol(
           stmt.name,
-          stmt.declKind === "const" ? SymbolKind.Variable : SymbolKind.Variable,
+          SymbolKind.Variable,
           stmt.span,
           stmt.nameSpan,
           { detail: `${stmt.declKind} ${stmt.name}${stmt.typeAnnotation ? ` of ${stmt.typeAnnotation}` : ""}` }
@@ -380,10 +380,23 @@ class Analyzer {
         for (const arm of expr.arms) this.visitMatchArm(arm);
         break;
 
-      case "TryExpr":
+      case "TryExpr": {
         for (const s of expr.tryBody) this.visitStmt(s);
+
+        const catchScope = createScope(this.currentScope, expr.span);
+        const prevTryScope = this.currentScope;
+        this.currentScope = catchScope;
+
+        if (expr.catchVar) {
+          this.declareSymbol(expr.catchVar, SymbolKind.Variable, expr.span, expr.span, {
+            detail: `(catch) ${expr.catchVar}`,
+          });
+        }
+
         for (const s of expr.catchBody) this.visitStmt(s);
+        this.currentScope = prevTryScope;
         break;
+      }
 
       case "Pipe":
       case "Coal":
@@ -491,19 +504,32 @@ class Analyzer {
         break;
       }
 
-      case "Getter":
+      case "Getter": {
         this.declareSymbol(member.name, SymbolKind.Property, member.span, member.nameSpan, {
           detail: `get fn ${member.name}`,
         });
+        const getterScope = createScope(this.currentScope, member.span);
+        const prevGetter = this.currentScope;
+        this.currentScope = getterScope;
         this.visitFnBody(member.body);
+        this.currentScope = prevGetter;
         break;
+      }
 
-      case "Setter":
+      case "Setter": {
         this.declareSymbol(member.name, SymbolKind.Property, member.span, member.nameSpan, {
           detail: `set fn ${member.name} ${member.paramName}`,
         });
+        const setterScope = createScope(this.currentScope, member.span);
+        const prevSetter = this.currentScope;
+        this.currentScope = setterScope;
+        this.declareSymbol(member.paramName, SymbolKind.Parameter, member.nameSpan, member.nameSpan, {
+          detail: `(parameter) ${member.paramName}`,
+        });
         this.visitFnBody(member.body);
+        this.currentScope = prevSetter;
         break;
+      }
 
       case "PrivateField":
         this.declareSymbol(member.name, SymbolKind.Property, member.span, member.nameSpan, {

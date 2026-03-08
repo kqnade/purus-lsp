@@ -73,6 +73,12 @@ documents.onDidChangeContent((change) => {
   validateDocument(change.document);
 });
 
+// Clean up on close
+documents.onDidClose((event) => {
+  cache.invalidate(event.document.uri);
+  connection.sendDiagnostics({ uri: event.document.uri, diagnostics: [] });
+});
+
 async function validateDocument(document: TextDocument): Promise<void> {
   const diagnostics = getDiagnostics(document.getText());
   connection.sendDiagnostics({ uri: document.uri, diagnostics });
@@ -111,7 +117,8 @@ connection.onHover((params: HoverParams): Hover | null => {
     data.rootScope,
     source,
     params.position.line,
-    params.position.character
+    params.position.character,
+    data.tokens
   );
 });
 
@@ -125,7 +132,8 @@ connection.onDefinition((params: DefinitionParams): Location | null => {
     params.textDocument.uri,
     params.position.line,
     params.position.character,
-    source
+    source,
+    data.tokens
   );
 });
 
@@ -140,7 +148,8 @@ connection.onReferences((params: ReferenceParams): Location[] => {
     params.position.line,
     params.position.character,
     source,
-    params.context.includeDeclaration
+    params.context.includeDeclaration,
+    data.tokens
   );
 });
 
