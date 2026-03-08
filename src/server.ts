@@ -13,15 +13,31 @@ import {
   CompletionItem,
   HoverParams,
   Hover,
-  MarkupKind,
+  DefinitionParams,
+  ReferenceParams,
+  DocumentSymbolParams,
+  DocumentSymbol,
+  SignatureHelpParams,
+  SemanticTokensParams,
+  SemanticTokens,
+  Location,
+  SignatureHelp,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { getDiagnostics } from "./diagnostics";
 import { formatDocument } from "./format";
-import { getCompletionItems, getKeywordInfo } from "./keywords";
+import { DocumentCache } from "./document-cache";
+import { TOKEN_TYPES, TOKEN_MODIFIERS, computeSemanticTokens } from "./semantic-tokens";
+import { getDocumentSymbols } from "./document-symbols";
+import { getDefinition } from "./definition";
+import { getReferences } from "./references";
+import { getSignatureHelp } from "./signature-help";
+import { getCompletions } from "./completion";
+import { getHoverInfo } from "./hover";
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);
+const cache = new DocumentCache();
 
 connection.onInitialize((_params: InitializeParams): InitializeResult => {
   return {
@@ -30,14 +46,30 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => {
       documentFormattingProvider: true,
       completionProvider: {
         resolveProvider: false,
+        triggerCharacters: [".", "["],
       },
       hoverProvider: true,
+      definitionProvider: true,
+      referencesProvider: true,
+      documentSymbolProvider: true,
+      signatureHelpProvider: {
+        triggerCharacters: ["[", ";"],
+      },
+      semanticTokensProvider: {
+        legend: {
+          tokenTypes: [...TOKEN_TYPES],
+          tokenModifiers: [...TOKEN_MODIFIERS],
+        },
+        full: true,
+        range: false,
+      },
     },
   };
 });
 
 // Validate on open and change
 documents.onDidChangeContent((change) => {
+  cache.invalidate(change.document.uri);
   validateDocument(change.document);
 });
 
@@ -46,39 +78,98 @@ async function validateDocument(document: TextDocument): Promise<void> {
   connection.sendDiagnostics({ uri: document.uri, diagnostics });
 }
 
+function getDocData(uri: string) {
+  const document = documents.get(uri);
+  if (!document) return null;
+  const source = document.getText();
+  const data = cache.getOrParse(uri, document.version, source);
+  return { document, source, data };
+}
+
 // Completion
 connection.onCompletion(
-  (_params: CompletionParams): CompletionItem[] => {
-    return getCompletionItems();
+  (params: CompletionParams): CompletionItem[] => {
+    const info = getDocData(params.textDocument.uri);
+    if (!info) return [];
+    const { source, data } = info;
+    return getCompletions(
+      data.rootScope,
+      data.tokens,
+      source,
+      params.position.line,
+      params.position.character
+    );
   }
 );
 
 // Hover
 connection.onHover((params: HoverParams): Hover | null => {
-  const document = documents.get(params.textDocument.uri);
-  if (!document) return null;
-
-  const text = document.getText();
-  const offset = document.offsetAt(params.position);
-
-  // Extract the word at cursor position (Purus identifiers support hyphens)
-  const before = text.slice(0, offset);
-  const after = text.slice(offset);
-  const matchBefore = before.match(/[a-zA-Z0-9-]*$/);
-  const matchAfter = after.match(/^[a-zA-Z0-9-]*/);
-  const word = (matchBefore?.[0] ?? "") + (matchAfter?.[0] ?? "");
-
-  if (!word) return null;
-
-  const info = getKeywordInfo(word);
+  const info = getDocData(params.textDocument.uri);
   if (!info) return null;
+  const { source, data } = info;
+  return getHoverInfo(
+    data.rootScope,
+    source,
+    params.position.line,
+    params.position.character
+  );
+});
 
-  return {
-    contents: {
-      kind: MarkupKind.Markdown,
-      value: `**\`${info.label}\`** — ${info.detail}\n\n${info.documentation}`,
-    },
-  };
+// Go to Definition
+connection.onDefinition((params: DefinitionParams): Location | null => {
+  const info = getDocData(params.textDocument.uri);
+  if (!info) return null;
+  const { source, data } = info;
+  return getDefinition(
+    data.rootScope,
+    params.textDocument.uri,
+    params.position.line,
+    params.position.character,
+    source
+  );
+});
+
+// Find References
+connection.onReferences((params: ReferenceParams): Location[] => {
+  const info = getDocData(params.textDocument.uri);
+  if (!info) return [];
+  const { source, data } = info;
+  return getReferences(
+    data.rootScope,
+    params.textDocument.uri,
+    params.position.line,
+    params.position.character,
+    source,
+    params.context.includeDeclaration
+  );
+});
+
+// Document Symbols
+connection.onDocumentSymbol((params: DocumentSymbolParams): DocumentSymbol[] => {
+  const info = getDocData(params.textDocument.uri);
+  if (!info) return [];
+  return getDocumentSymbols(info.data.program);
+});
+
+// Signature Help
+connection.onSignatureHelp((params: SignatureHelpParams): SignatureHelp | null => {
+  const info = getDocData(params.textDocument.uri);
+  if (!info) return null;
+  const { source, data } = info;
+  return getSignatureHelp(
+    data.rootScope,
+    data.tokens,
+    source,
+    params.position.line,
+    params.position.character
+  );
+});
+
+// Semantic Tokens
+connection.languages.semanticTokens.on((params: SemanticTokensParams): SemanticTokens => {
+  const info = getDocData(params.textDocument.uri);
+  if (!info) return { data: [] };
+  return { data: computeSemanticTokens(info.data.tokens, info.data.rootScope) };
 });
 
 // Format
