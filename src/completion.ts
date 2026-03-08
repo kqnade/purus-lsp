@@ -112,5 +112,9 @@ function symbolKindToCompletionKind(kind: SymbolKind): CompletionItemKind {
       return CompletionItemKind.Module;
     case SymbolKind.Type:
       return CompletionItemKind.TypeParameter;
+    default: {
+      const _exhaustive: never = kind;
+      return CompletionItemKind.Text;
+    }
   }
 }

@@ -268,7 +268,6 @@ class Lexer {
     this.advance(); // /
 
     let value = "";
-    let hasInterpolation = false;
 
     while (this.pos < this.source.length) {
       if (this.match("///")) {
@@ -306,7 +305,6 @@ class Lexer {
       }
 
       if (ch === "[") {
-        hasInterpolation = true;
         let depth = 1;
         value += "[";
         this.advance();
@@ -380,7 +378,7 @@ class Lexer {
 
     // Read flags
     let flags = "";
-    while (this.pos < this.source.length && /[gimsuy]/.test(this.source[this.pos])) {
+    while (this.pos < this.source.length && /[dgimsuvy]/.test(this.source[this.pos])) {
       flags += this.source[this.pos];
       this.advance();
     }

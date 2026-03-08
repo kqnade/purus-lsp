@@ -154,6 +154,10 @@ function classMemberToSymbol(member: ClassMember): DocumentSymbol | null {
         range: spanToRange(member.span),
         selectionRange: spanToRange(member.nameSpan),
       };
+    default: {
+      const _exhaustive: never = member;
+      return null;
+    }
   }
 }
 
