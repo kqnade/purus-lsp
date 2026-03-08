@@ -405,6 +405,7 @@ class Parser {
       this.expect(TokenKind.In, "Expected 'in'");
 
       if (this.check(TokenKind.Range)) {
+        this.addError("Range iteration does not support index variable");
         this.advance();
         const rangeStart = this.parseExpression();
         this.expect(TokenKind.Semicolon, "Expected ';'");
