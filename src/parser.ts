@@ -330,9 +330,11 @@ class Parser {
       this.skipNewlines();
       if (this.isAtEnd()) break;
 
+      const savedPos = this.pos;
+
       if (this.check(TokenKind.Indent)) {
         const indentVal = this.peek().value as number;
-        if (indentVal > this.currentIndent) break;
+        if (indentVal !== this.currentIndent) break;
         this.advance();
       }
 
@@ -354,6 +356,7 @@ class Parser {
           break;
         }
       } else {
+        this.pos = savedPos;
         break;
       }
     }
@@ -488,6 +491,7 @@ class Parser {
       this.skipNewlines();
       if (this.isAtEnd()) break;
 
+      const savedPos = this.pos;
       const indent = this.getIndentLevel();
       if (indent < this.currentIndent) break;
       if (this.check(TokenKind.Indent)) this.advance();
@@ -498,6 +502,7 @@ class Parser {
         arms.push(this.parseElseArm());
         break;
       } else {
+        this.pos = savedPos;
         break;
       }
     }
@@ -564,10 +569,13 @@ class Parser {
 
     let finallyBody: Stmt[] | undefined;
     this.skipNewlines();
+    const savedPos = this.pos;
     if (this.check(TokenKind.Indent)) this.advance();
     if (this.check(TokenKind.Finally)) {
       this.advance();
       finallyBody = this.parseBlock();
+    } else {
+      this.pos = savedPos;
     }
 
     return {
@@ -1584,6 +1592,7 @@ class Parser {
       while (!this.isAtEnd()) {
         this.skipNewlines();
         if (this.isAtEnd()) break;
+        const savedPos = this.pos;
         const indent = this.getIndentLevel();
         if (indent < this.currentIndent) break;
         if (this.check(TokenKind.Indent)) this.advance();
@@ -1594,6 +1603,7 @@ class Parser {
           arms.push(this.parseElseArm());
           break;
         } else {
+          this.pos = savedPos;
           break;
         }
       }
