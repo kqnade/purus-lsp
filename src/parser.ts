@@ -21,9 +21,9 @@ class Parser {
   private currentIndent: number = 0;
 
   constructor(tokens: Token[]) {
-    // Filter out comments for parsing, but keep them in original for semantic tokens
+    // Filter out trivia for parsing, but keep them in original for semantic tokens
     this.tokens = tokens.filter(
-      (t) => t.kind !== TokenKind.Comment && t.kind !== TokenKind.BlockComment
+      (t) => t.kind !== TokenKind.Comment && t.kind !== TokenKind.BlockComment && t.kind !== TokenKind.Shebang
     );
   }
 
