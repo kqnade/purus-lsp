@@ -512,21 +512,30 @@ class Lexer {
     return this.isIdentStart(ch) || this.isDigit(ch) || ch === "-";
   }
 
+  // Token kinds after which `-` or `/` starts a new expression
+  // (negative number literal or regex literal) rather than an
+  // infix operator (subtraction or division).
+  private static readonly EXPR_START_KINDS = new Set([
+    TokenKind.LBracket, TokenKind.Comma, TokenKind.Semicolon,
+    TokenKind.Be, TokenKind.Backslash, TokenKind.Newline,
+    TokenKind.Indent, TokenKind.Return, TokenKind.To,
+    TokenKind.Then, TokenKind.Coal, TokenKind.Pipe,
+    TokenKind.Eq, TokenKind.Neq, TokenKind.And, TokenKind.Or,
+    TokenKind.Not, TokenKind.If, TokenKind.Elif, TokenKind.Else,
+    TokenKind.Unless, TokenKind.While, TokenKind.Until,
+    TokenKind.For, TokenKind.In,
+    TokenKind.Match, TokenKind.When, TokenKind.Throw, TokenKind.Await,
+  ]);
+
+  private isExprStartAfter(prev: Token | undefined): boolean {
+    if (!prev) return true;
+    return Lexer.EXPR_START_KINDS.has(prev.kind);
+  }
+
   private isNegativeNumberStart(): boolean {
     if (this.pos + 1 >= this.source.length) return false;
     if (!this.isDigit(this.source[this.pos + 1])) return false;
-
-    // Check previous non-trivia token
-    const prev = this.lastNonTriviaToken();
-    if (!prev) return true;
-
-    const allowedKinds = new Set([
-      TokenKind.LBracket, TokenKind.Comma, TokenKind.Semicolon,
-      TokenKind.Be, TokenKind.Backslash, TokenKind.Newline,
-      TokenKind.Indent, TokenKind.Return, TokenKind.To,
-      TokenKind.Then, TokenKind.Coal,
-    ]);
-    return allowedKinds.has(prev.kind);
+    return this.isExprStartAfter(this.lastNonTriviaToken());
   }
 
   private isRegexStart(): boolean {
@@ -536,28 +545,17 @@ class Lexer {
     if (this.pos + 1 >= this.source.length) return false;
     const next = this.source[this.pos + 1];
     if (next === " " || next === "\n" || next === "\r") return false;
-
-    // Check previous token - regex can follow:
-    // be, [, ;, ,, newline, indent, return, to, then, or start of file
-    const prev = this.lastNonTriviaToken();
-    if (!prev) return true;
-
-    const allowedKinds = new Set([
-      TokenKind.Be, TokenKind.LBracket, TokenKind.Semicolon,
-      TokenKind.Comma, TokenKind.Newline, TokenKind.Indent,
-      TokenKind.Return, TokenKind.To, TokenKind.Then,
-      TokenKind.Eq, TokenKind.Neq, TokenKind.And, TokenKind.Or,
-      TokenKind.Not, TokenKind.If, TokenKind.Elif, TokenKind.Else,
-      TokenKind.Unless, TokenKind.While, TokenKind.Until,
-      TokenKind.For, TokenKind.In, TokenKind.Coal, TokenKind.Pipe,
-    ]);
-    return allowedKinds.has(prev.kind);
+    return this.isExprStartAfter(this.lastNonTriviaToken());
   }
 
   private lastNonTriviaToken(): Token | undefined {
     for (let i = this.tokens.length - 1; i >= 0; i--) {
       const t = this.tokens[i];
-      if (t.kind !== TokenKind.Comment && t.kind !== TokenKind.BlockComment) {
+      if (
+        t.kind !== TokenKind.Comment &&
+        t.kind !== TokenKind.BlockComment &&
+        t.kind !== TokenKind.Shebang
+      ) {
         return t;
       }
     }
