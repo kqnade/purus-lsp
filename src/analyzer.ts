@@ -381,10 +381,13 @@ class Analyzer {
         break;
 
       case "TryExpr": {
+        const tryScope = createScope(this.currentScope, expr.span);
+        const prevTryScope = this.currentScope;
+        this.currentScope = tryScope;
         for (const s of expr.tryBody) this.visitStmt(s);
+        this.currentScope = prevTryScope;
 
         const catchScope = createScope(this.currentScope, expr.span);
-        const prevTryScope = this.currentScope;
         this.currentScope = catchScope;
 
         if (expr.catchVar) {
@@ -545,7 +548,7 @@ class Analyzer {
     if (arm.pattern) this.visitExpr(arm.pattern);
     if (arm.guard) this.visitExpr(arm.guard);
     if (arm.body.kind === "block") {
-      for (const s of arm.body.stmts) this.visitStmt(s);
+      this.visitBlock(arm.body.stmts, arm.span);
     } else {
       this.visitExpr(arm.body.expr);
     }
