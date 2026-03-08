@@ -68,6 +68,10 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => {
 });
 
 // Validate on open and change
+documents.onDidOpen((event) => {
+  validateDocument(event.document);
+});
+
 documents.onDidChangeContent((change) => {
   cache.invalidate(change.document.uri);
   validateDocument(change.document);
