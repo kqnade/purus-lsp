@@ -69,12 +69,13 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => {
 
 // Validate on open and change
 documents.onDidOpen((event) => {
-  validateDocument(event.document);
+  cache.invalidate(event.document.uri);
+  void validateDocument(event.document);
 });
 
 documents.onDidChangeContent((change) => {
   cache.invalidate(change.document.uri);
-  validateDocument(change.document);
+  void validateDocument(change.document);
 });
 
 // Clean up on close
