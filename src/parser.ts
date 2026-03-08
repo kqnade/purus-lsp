@@ -313,8 +313,8 @@ class Parser {
         expr: {
           type: "IfExpr",
           condition,
-          then: thenExpr,
-          else: elseExpr,
+          thenBranch: thenExpr,
+          elseBranch: elseExpr,
           span: this.spanFrom(start),
         },
         span: this.spanFrom(start),
@@ -1570,8 +1570,8 @@ class Parser {
     return {
       type: "IfExpr",
       condition,
-      then: thenExpr,
-      else: elseExpr,
+      thenBranch: thenExpr,
+      elseBranch: elseExpr,
       span: this.spanFrom(start),
     };
   }

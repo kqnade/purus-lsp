@@ -531,8 +531,8 @@ export interface FnExpr {
 export interface IfExpr {
   type: "IfExpr";
   condition: Expr;
-  then: Expr;
-  else: Expr;
+  thenBranch: Expr;
+  elseBranch: Expr;
   span: Span;
 }
 

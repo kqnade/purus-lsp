@@ -371,8 +371,8 @@ class Analyzer {
 
       case "IfExpr":
         this.visitExpr(expr.condition);
-        this.visitExpr(expr.then);
-        this.visitExpr(expr.else);
+        this.visitExpr(expr.thenBranch);
+        this.visitExpr(expr.elseBranch);
         break;
 
       case "MatchExpr":
