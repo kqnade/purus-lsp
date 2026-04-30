@@ -33,6 +33,16 @@ export enum TokenKind {
   Mod,
   Neg,
   Pow,
+  Fdiv,
+
+  // Bitwise
+  Band,
+  Bor,
+  Bxor,
+  Bnot,
+  Shl,
+  Shr,
+  Ushr,
 
   // Comparison
   Eq,
@@ -67,10 +77,13 @@ export enum TokenKind {
   Range,
   Break,
   Continue,
+  Do,
 
   // Pattern matching
   Match,
   When,
+  Switch,
+  Case,
 
   // Pipe / Nullish
   Pipe,
@@ -97,9 +110,10 @@ export enum TokenKind {
   Get,
   Set,
 
-  // Async
+  // Async / Generator
   Async,
   Await,
+  Yield,
 
   // Error handling
   Try,
@@ -119,11 +133,14 @@ export enum TokenKind {
   All,
   With,
 
-  // Null family
+  // Null family / literals
   Null,
   Nil,
   Undefined,
   Nan,
+  Infinity,
+  BigInt,
+  Void,
 
   // Collection
   List,
@@ -173,6 +190,14 @@ export const KEYWORDS: ReadonlyMap<string, TokenKind> = new Map([
   ["mod", TokenKind.Mod],
   ["neg", TokenKind.Neg],
   ["pow", TokenKind.Pow],
+  ["fdiv", TokenKind.Fdiv],
+  ["band", TokenKind.Band],
+  ["bor", TokenKind.Bor],
+  ["bxor", TokenKind.Bxor],
+  ["bnot", TokenKind.Bnot],
+  ["shl", TokenKind.Shl],
+  ["shr", TokenKind.Shr],
+  ["ushr", TokenKind.Ushr],
   ["eq", TokenKind.Eq],
   ["neq", TokenKind.Neq],
   ["lt", TokenKind.Lt],
@@ -197,8 +222,12 @@ export const KEYWORDS: ReadonlyMap<string, TokenKind> = new Map([
   ["range", TokenKind.Range],
   ["break", TokenKind.Break],
   ["continue", TokenKind.Continue],
+  ["do", TokenKind.Do],
+  ["yield", TokenKind.Yield],
   ["match", TokenKind.Match],
   ["when", TokenKind.When],
+  ["switch", TokenKind.Switch],
+  ["case", TokenKind.Case],
   ["pipe", TokenKind.Pipe],
   ["coal", TokenKind.Coal],
   ["is", TokenKind.Is],
@@ -220,6 +249,10 @@ export const KEYWORDS: ReadonlyMap<string, TokenKind> = new Map([
   ["set", TokenKind.Set],
   ["async", TokenKind.Async],
   ["await", TokenKind.Await],
+  ["void", TokenKind.Void],
+  ["infinity", TokenKind.Infinity],
+  ["function", TokenKind.Fn],
+  ["protected", TokenKind.Private],
   ["try", TokenKind.Try],
   ["catch", TokenKind.Catch],
   ["finally", TokenKind.Finally],
@@ -232,6 +265,7 @@ export const KEYWORDS: ReadonlyMap<string, TokenKind> = new Map([
   ["use", TokenKind.Use],
   ["namespace", TokenKind.Namespace],
   ["pub", TokenKind.Pub],
+  ["public", TokenKind.Pub],
   ["all", TokenKind.All],
   ["with", TokenKind.With],
   ["true", TokenKind.True],

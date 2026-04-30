@@ -57,6 +57,11 @@ class Analyzer {
         this.visitExpr(stmt.value);
         break;
 
+      case "CompoundAssign":
+        this.visitExpr(stmt.target);
+        this.visitExpr(stmt.value);
+        break;
+
       case "FnDecl": {
         const params: ParamInfo[] = stmt.params.map((p) => ({
           name: p.name,
@@ -140,6 +145,11 @@ class Analyzer {
         this.visitBlock(stmt.body, stmt.span);
         break;
 
+      case "DoWhile":
+        this.visitExpr(stmt.condition);
+        this.visitBlock(stmt.body, stmt.span);
+        break;
+
       case "ForIn": {
         const forScope = createScope(this.currentScope, stmt.span);
         const prev = this.currentScope;
@@ -177,6 +187,31 @@ class Analyzer {
         this.currentScope = prev;
         break;
       }
+
+      case "ForClassic": {
+        const forScope = createScope(this.currentScope, stmt.span);
+        const prev = this.currentScope;
+        this.currentScope = forScope;
+        this.visitStmt(stmt.init);
+        this.visitExpr(stmt.condition);
+        this.visitStmt(stmt.update);
+        for (const s of stmt.body) this.visitStmt(s);
+        this.currentScope = prev;
+        break;
+      }
+
+      case "Switch":
+        this.visitExpr(stmt.subject);
+        for (const arm of stmt.arms) {
+          if (arm.pattern) this.visitExpr(arm.pattern);
+          if (arm.guard) this.visitExpr(arm.guard);
+          if (Array.isArray(arm.body)) {
+            for (const s of arm.body) this.visitStmt(s);
+          } else {
+            this.visitExpr(arm.body);
+          }
+        }
+        break;
 
       case "Match":
         this.visitExpr(stmt.subject);
@@ -380,6 +415,19 @@ class Analyzer {
         for (const arm of expr.arms) this.visitMatchArm(arm);
         break;
 
+      case "SwitchExpr":
+        this.visitExpr(expr.subject);
+        for (const arm of expr.arms) {
+          if (arm.pattern) this.visitExpr(arm.pattern);
+          if (arm.guard) this.visitExpr(arm.guard);
+          if (Array.isArray(arm.body)) {
+            for (const s of arm.body) this.visitStmt(s);
+          } else {
+            this.visitExpr(arm.body);
+          }
+        }
+        break;
+
       case "TryExpr": {
         const tryScope = createScope(this.currentScope, expr.span);
         const prevTryScope = this.currentScope;
@@ -439,6 +487,17 @@ class Analyzer {
         this.visitExpr(expr.expr);
         break;
 
+      case "PostInc":
+      case "PostDec":
+      case "PreInc":
+      case "PreDec":
+        this.visitExpr(expr.operand);
+        break;
+
+      case "Yield":
+        if (expr.expr) this.visitExpr(expr.expr);
+        break;
+
       // Literals - nothing to visit
       case "IntLit":
       case "FloatLit":
@@ -448,6 +507,8 @@ class Analyzer {
       case "NullLit":
       case "UndefinedLit":
       case "NanLit":
+      case "InfinityLit":
+      case "BigIntLit":
       case "This":
       case "Super":
         break;

@@ -25,13 +25,23 @@ const keywords: KeywordInfo[] = [
   { label: "gives", detail: "(return type annotation)", documentation: "戻り値の型注釈（コンパイル時に無視される）。`fn name[x] gives number`", kind: CompletionItemKind.Keyword },
 
   // Arithmetic Operators
-  { label: "add", detail: "+ (addition)", documentation: "加算。`a add b` → `a + b`", kind: CompletionItemKind.Operator },
-  { label: "sub", detail: "- (subtraction)", documentation: "減算。`a sub b` → `a - b`", kind: CompletionItemKind.Operator },
+  { label: "add", detail: "+ (addition)", documentation: "加算。`a add b` → `a + b`。インクリメント: `x\\add` → `x++`、`add\\x` → `++x`", kind: CompletionItemKind.Operator },
+  { label: "sub", detail: "- (subtraction)", documentation: "減算。`a sub b` → `a - b`。デクリメント: `x\\sub` → `x--`、`sub\\x` → `--x`", kind: CompletionItemKind.Operator },
   { label: "mul", detail: "* (multiplication)", documentation: "乗算。`a mul b` → `a * b`", kind: CompletionItemKind.Operator },
   { label: "div", detail: "/ (division)", documentation: "除算。`a div b` → `a / b`", kind: CompletionItemKind.Operator },
   { label: "mod", detail: "% (modulo)", documentation: "剰余。`a mod b` → `a % b`", kind: CompletionItemKind.Operator },
   { label: "pow", detail: "** (exponentiation)", documentation: "べき乗。`a pow b` → `a ** b`", kind: CompletionItemKind.Operator },
+  { label: "fdiv", detail: "// (floor division)", documentation: "切り捨て除算。`a fdiv b` → `Math.floor(a / b)`", kind: CompletionItemKind.Operator },
   { label: "neg", detail: "- (unary negation)", documentation: "単項否定。`neg x` → `-x`", kind: CompletionItemKind.Operator },
+
+  // Bitwise Operators
+  { label: "band", detail: "& (bitwise AND)", documentation: "ビット AND。`a band b` → `a & b`。複合代入: `a band be b` → `a &= b`", kind: CompletionItemKind.Operator },
+  { label: "bor", detail: "| (bitwise OR)", documentation: "ビット OR。`a bor b` → `a | b`。複合代入: `a bor be b` → `a |= b`", kind: CompletionItemKind.Operator },
+  { label: "bxor", detail: "^ (bitwise XOR)", documentation: "ビット XOR。`a bxor b` → `a ^ b`。複合代入: `a bxor be b` → `a ^= b`", kind: CompletionItemKind.Operator },
+  { label: "bnot", detail: "~ (bitwise NOT)", documentation: "ビット NOT。`bnot x` → `~x`", kind: CompletionItemKind.Operator },
+  { label: "shl", detail: "<< (left shift)", documentation: "左シフト。`a shl b` → `a << b`。複合代入: `a shl be b` → `a <<= b`", kind: CompletionItemKind.Operator },
+  { label: "shr", detail: ">> (right shift)", documentation: "右シフト。`a shr b` → `a >> b`。複合代入: `a shr be b` → `a >>= b`", kind: CompletionItemKind.Operator },
+  { label: "ushr", detail: ">>> (unsigned right shift)", documentation: "符号なし右シフト。`a ushr b` → `a >>> b`。複合代入: `a ushr be b` → `a >>>= b`", kind: CompletionItemKind.Operator },
 
   // Comparison Operators
   { label: "eq", detail: "=== (strict equality)", documentation: "厳密等価。`a eq b` → `a === b`", kind: CompletionItemKind.Operator },
@@ -58,15 +68,19 @@ const keywords: KeywordInfo[] = [
   // Loops
   { label: "while", detail: "while", documentation: "条件が true の間ループ。`while cond` → `while (cond)`", kind: CompletionItemKind.Keyword },
   { label: "until", detail: "while (!(cond))", documentation: "条件が true になるまでループ（while の逆）", kind: CompletionItemKind.Keyword },
-  { label: "for", detail: "for...of", documentation: "イテラブルを反復。`for x in list` → `for (const x of list)`. インデックス付き: `for i; x in list`", kind: CompletionItemKind.Keyword },
+  { label: "do", detail: "do-while", documentation: "do-while ループ。`do ... while cond` → `do { ... } while (cond)`", kind: CompletionItemKind.Keyword },
+  { label: "for", detail: "for...of", documentation: "イテラブルを反復。`for x in list` → `for (const x of list)`. インデックス付き: `for i; x in list`。JS スタイル: `for let i be 0; i lt 10; i\\add`", kind: CompletionItemKind.Keyword },
   { label: "in", detail: "of (in for loop)", documentation: "for ループ内でイテラブルを指定。`for x in list`", kind: CompletionItemKind.Keyword },
   { label: "range", detail: "numeric range", documentation: "数値範囲ループ。`for x in range start; end` → `for (let x = start; x < end; x++)`", kind: CompletionItemKind.Keyword },
   { label: "break", detail: "break", documentation: "現在のループを抜ける", kind: CompletionItemKind.Keyword },
   { label: "continue", detail: "continue", documentation: "次のループ反復にスキップ", kind: CompletionItemKind.Keyword },
+  { label: "yield", detail: "yield (generator)", documentation: "ジェネレータ関数内で値を生成。`yield x` → `yield x`", kind: CompletionItemKind.Keyword },
 
   // Pattern Matching
   { label: "match", detail: "match (pattern matching)", documentation: "パターンマッチ。`match expr` の後に `when` アームを記述", kind: CompletionItemKind.Keyword },
   { label: "when", detail: "when (match arm)", documentation: "マッチアーム。`when value` → `if (subject === value)`", kind: CompletionItemKind.Keyword },
+  { label: "switch", detail: "switch", documentation: "switch 文。`switch expr` の後に `case value` アームを記述", kind: CompletionItemKind.Keyword },
+  { label: "case", detail: "case (switch arm)", documentation: "switch アーム。`case value` → `case value:`", kind: CompletionItemKind.Keyword },
 
   // Error Handling
   { label: "try", detail: "try", documentation: "try ブロック", kind: CompletionItemKind.Keyword },
@@ -83,6 +97,7 @@ const keywords: KeywordInfo[] = [
   { label: "use", detail: "use (named import)", documentation: "名前付きインポート。`from mod.path use name1, name2`", kind: CompletionItemKind.Keyword },
   { label: "namespace", detail: "namespace (IIFE)", documentation: "名前空間を宣言。IIFE にコンパイルされる。`namespace mymod` → `const mymod = (() => { ... })()`", kind: CompletionItemKind.Keyword },
   { label: "pub", detail: "export (public)", documentation: "宣言を公開/エクスポートする。`pub fn name` → `export function name`", kind: CompletionItemKind.Keyword },
+  { label: "public", detail: "export (public alias)", documentation: "`pub` のエイリアス。`public fn name` → `export function name`", kind: CompletionItemKind.Keyword },
   { label: "all", detail: "* as (namespace import)", documentation: "名前空間インポート。`import all as ns from ///path///`", kind: CompletionItemKind.Keyword },
   { label: "with", detail: "import attributes", documentation: "インポート属性。`import data from ///data.json/// with [ type be ///json/// ]`", kind: CompletionItemKind.Keyword },
 
@@ -101,6 +116,8 @@ const keywords: KeywordInfo[] = [
   { label: "nil", detail: "null (alias)", documentation: "null のエイリアス（`null` の使用を推奨）", kind: CompletionItemKind.Value },
   { label: "undefined", detail: "undefined", documentation: "undefined リテラル", kind: CompletionItemKind.Value },
   { label: "nan", detail: "NaN", documentation: "NaN リテラル。`nan` → `NaN`", kind: CompletionItemKind.Value },
+  { label: "infinity", detail: "Infinity", documentation: "無限大リテラル。`infinity` → `Infinity`。負の無限大: `neg infinity` → `-Infinity`", kind: CompletionItemKind.Value },
+  { label: "void", detail: "void (unary)", documentation: "void 演算子。`void expr` → `void expr`", kind: CompletionItemKind.Operator },
 
   // OOP / Reference
   { label: "new", detail: "new", documentation: "インスタンスを生成。`new Foo[args]` → `new Foo(args)`", kind: CompletionItemKind.Keyword },

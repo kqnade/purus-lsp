@@ -81,13 +81,17 @@ function mapToken(token: Token, rootScope: Scope): [TokenTypeIndex, TokenModifie
     case TokenKind.Then:
     case TokenKind.While:
     case TokenKind.Until:
+    case TokenKind.Do:
     case TokenKind.For:
     case TokenKind.In:
     case TokenKind.Range:
     case TokenKind.Break:
     case TokenKind.Continue:
+    case TokenKind.Yield:
     case TokenKind.Match:
     case TokenKind.When:
+    case TokenKind.Switch:
+    case TokenKind.Case:
     case TokenKind.Try:
     case TokenKind.Catch:
     case TokenKind.Finally:
@@ -104,6 +108,7 @@ function mapToken(token: Token, rootScope: Scope): [TokenTypeIndex, TokenModifie
     case TokenKind.With:
     case TokenKind.Async:
     case TokenKind.Await:
+    case TokenKind.Void:
     case TokenKind.New:
     case TokenKind.Delete:
     case TokenKind.This:
@@ -125,7 +130,15 @@ function mapToken(token: Token, rootScope: Scope): [TokenTypeIndex, TokenModifie
     case TokenKind.Div:
     case TokenKind.Mod:
     case TokenKind.Pow:
+    case TokenKind.Fdiv:
     case TokenKind.Neg:
+    case TokenKind.Band:
+    case TokenKind.Bor:
+    case TokenKind.Bxor:
+    case TokenKind.Bnot:
+    case TokenKind.Shl:
+    case TokenKind.Shr:
+    case TokenKind.Ushr:
     case TokenKind.Eq:
     case TokenKind.Neq:
     case TokenKind.Lt:
@@ -161,7 +174,11 @@ function mapToken(token: Token, rootScope: Scope): [TokenTypeIndex, TokenModifie
     case TokenKind.Nil:
     case TokenKind.Undefined:
     case TokenKind.Nan:
+    case TokenKind.Infinity:
       return [typeIndex["enumMember"], 0];
+
+    case TokenKind.BigInt:
+      return [typeIndex["number"], 0];
 
     // Comments
     case TokenKind.Comment:
