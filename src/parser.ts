@@ -1459,7 +1459,7 @@ class Parser {
           token.kind === TokenKind.RBracket || token.kind === TokenKind.Indent) {
         return { type: "Yield", span: this.spanFrom(start) };
       }
-      const expr = this.parseUnary();
+      const expr = this.parseExpression();
       return { type: "Yield", expr, span: this.spanFrom(start) };
     }
 
