@@ -13,14 +13,18 @@ export type Stmt =
   | ArrayDestructStmt
   | ObjectDestructStmt
   | AssignStmt
+  | CompoundAssignStmt
   | FnDeclStmt
   | ClassDeclStmt
   | IfStmt
   | UnlessStmt
   | WhileStmt
   | UntilStmt
+  | DoWhileStmt
   | ForInStmt
   | ForRangeStmt
+  | ForClassicStmt
+  | SwitchStmt
   | MatchStmt
   | TryCatchStmt
   | ThrowStmt
@@ -72,6 +76,14 @@ export interface AssignStmt {
   span: Span;
 }
 
+export interface CompoundAssignStmt {
+  type: "CompoundAssign";
+  op: BinaryOp;
+  target: Expr;
+  value: Expr;
+  span: Span;
+}
+
 export interface FnDeclStmt {
   type: "FnDecl";
   name: string;
@@ -80,6 +92,7 @@ export interface FnDeclStmt {
   returnType?: string;
   body: FnBody;
   isAsync: boolean;
+  isGenerator: boolean;
   span: Span;
 }
 
@@ -91,7 +104,8 @@ export interface Param {
 
 export type FnBody =
   | { kind: "block"; stmts: Stmt[] }
-  | { kind: "expr"; expr: Expr };
+  | { kind: "expr"; expr: Expr }
+  | { kind: "toReturn"; expr: Expr };
 
 export interface ClassDeclStmt {
   type: "ClassDecl";
@@ -184,6 +198,13 @@ export interface UntilStmt {
   span: Span;
 }
 
+export interface DoWhileStmt {
+  type: "DoWhile";
+  condition: Expr;
+  body: Stmt[];
+  span: Span;
+}
+
 export interface ForInStmt {
   type: "ForIn";
   variable: string;
@@ -202,6 +223,29 @@ export interface ForRangeStmt {
   start: Expr;
   end: Expr;
   body: Stmt[];
+  span: Span;
+}
+
+export interface ForClassicStmt {
+  type: "ForClassic";
+  init: Stmt;
+  condition: Expr;
+  update: Stmt;
+  body: Stmt[];
+  span: Span;
+}
+
+export interface SwitchStmt {
+  type: "Switch";
+  subject: Expr;
+  arms: SwitchArm[];
+  span: Span;
+}
+
+export interface SwitchArm {
+  pattern?: Expr; // undefined = default arm
+  guard?: Expr;
+  body: Stmt[] | Expr;
   span: Span;
 }
 
@@ -373,6 +417,7 @@ export type Expr =
   | FnExpr
   | IfExpr
   | MatchExpr
+  | SwitchExpr
   | TryExpr
   | PipeExpr
   | CoalExpr
@@ -383,7 +428,14 @@ export type Expr =
   | AwaitExpr
   | NewExpr
   | DeleteExpr
-  | GroupExpr;
+  | GroupExpr
+  | PostIncExpr
+  | PostDecExpr
+  | PreIncExpr
+  | PreDecExpr
+  | InfinityLitExpr
+  | BigIntLitExpr
+  | YieldExpr;
 
 export interface IntLitExpr {
   type: "IntLit";
@@ -475,9 +527,10 @@ export interface RangeExpr {
 }
 
 export type BinaryOp =
-  | "add" | "sub" | "mul" | "div" | "mod" | "pow"
+  | "add" | "sub" | "mul" | "div" | "mod" | "pow" | "fdiv"
   | "eq" | "neq" | "lt" | "gt" | "le" | "ge"
-  | "and" | "or";
+  | "and" | "or" | "coal"
+  | "band" | "bor" | "bxor" | "shl" | "shr" | "ushr";
 
 export interface BinOpExpr {
   type: "BinOp";
@@ -489,7 +542,7 @@ export interface BinOpExpr {
 
 export interface UnaryExpr {
   type: "Unary";
-  op: "not" | "neg";
+  op: "not" | "neg" | "bnot" | "void";
   operand: Expr;
   span: Span;
 }
@@ -539,6 +592,7 @@ export interface FnExpr {
   returnType?: string;
   body: FnBody;
   isAsync: boolean;
+  isGenerator: boolean;
   span: Span;
 }
 
@@ -554,6 +608,13 @@ export interface MatchExpr {
   type: "MatchExpr";
   subject: Expr;
   arms: MatchArm[];
+  span: Span;
+}
+
+export interface SwitchExpr {
+  type: "SwitchExpr";
+  subject: Expr;
+  arms: SwitchArm[];
   span: Span;
 }
 
@@ -627,5 +688,47 @@ export interface DeleteExpr {
 export interface GroupExpr {
   type: "Group";
   expr: Expr;
+  span: Span;
+}
+
+export interface PostIncExpr {
+  type: "PostInc";
+  operand: Expr;
+  span: Span;
+}
+
+export interface PostDecExpr {
+  type: "PostDec";
+  operand: Expr;
+  span: Span;
+}
+
+export interface PreIncExpr {
+  type: "PreInc";
+  operand: Expr;
+  span: Span;
+}
+
+export interface PreDecExpr {
+  type: "PreDec";
+  operand: Expr;
+  span: Span;
+}
+
+export interface InfinityLitExpr {
+  type: "InfinityLit";
+  negative: boolean;
+  span: Span;
+}
+
+export interface BigIntLitExpr {
+  type: "BigIntLit";
+  raw: string;
+  span: Span;
+}
+
+export interface YieldExpr {
+  type: "Yield";
+  expr?: Expr;
   span: Span;
 }
