@@ -396,13 +396,57 @@ class Lexer {
   private readNumber(): void {
     const start = this.makePos();
     let text = "";
-    let isFloat = false;
+    let isNeg = false;
 
     if (this.source[this.pos] === "-") {
+      isNeg = true;
       text += "-";
       this.advance();
     }
 
+    // Binary literal: 0b...
+    if (this.source[this.pos] === "0" && this.pos + 1 < this.source.length &&
+        (this.source[this.pos + 1] === "b" || this.source[this.pos + 1] === "B")) {
+      text += "0";
+      this.advance();
+      text += this.source[this.pos];
+      this.advance();
+      while (this.pos < this.source.length && (this.source[this.pos] === "0" || this.source[this.pos] === "1")) {
+        text += this.source[this.pos];
+        this.advance();
+      }
+      if (this.pos < this.source.length && this.source[this.pos] === "n") {
+        text += "n";
+        this.advance();
+        this.pushToken(TokenKind.BigInt, text, start, this.makePos(), text);
+      } else {
+        this.pushToken(TokenKind.Int, text, start, this.makePos(), parseInt(text, 2));
+      }
+      return;
+    }
+
+    // Hexadecimal literal: 0x...
+    if (this.source[this.pos] === "0" && this.pos + 1 < this.source.length &&
+        (this.source[this.pos + 1] === "x" || this.source[this.pos + 1] === "X")) {
+      text += "0";
+      this.advance();
+      text += this.source[this.pos];
+      this.advance();
+      while (this.pos < this.source.length && this.isHexDigit(this.source[this.pos])) {
+        text += this.source[this.pos];
+        this.advance();
+      }
+      if (this.pos < this.source.length && this.source[this.pos] === "n") {
+        text += "n";
+        this.advance();
+        this.pushToken(TokenKind.BigInt, text, start, this.makePos(), text);
+      } else {
+        this.pushToken(TokenKind.Int, text, start, this.makePos(), parseInt(text, 16));
+      }
+      return;
+    }
+
+    // Decimal (integer or float)
     while (this.pos < this.source.length && this.isDigit(this.source[this.pos])) {
       text += this.source[this.pos];
       this.advance();
@@ -410,18 +454,29 @@ class Lexer {
 
     if (this.pos < this.source.length && this.source[this.pos] === "." &&
         this.pos + 1 < this.source.length && this.isDigit(this.source[this.pos + 1])) {
-      isFloat = true;
       text += ".";
       this.advance();
       while (this.pos < this.source.length && this.isDigit(this.source[this.pos])) {
         text += this.source[this.pos];
         this.advance();
       }
+      this.pushToken(TokenKind.Float, text, start, this.makePos(), parseFloat(text));
+      return;
     }
 
-    const kind = isFloat ? TokenKind.Float : TokenKind.Int;
-    const value = isFloat ? parseFloat(text) : parseInt(text, 10);
-    this.pushToken(kind, text, start, this.makePos(), value);
+    // BigInt suffix
+    if (this.pos < this.source.length && this.source[this.pos] === "n") {
+      text += "n";
+      this.advance();
+      this.pushToken(TokenKind.BigInt, text, start, this.makePos(), text);
+      return;
+    }
+
+    this.pushToken(TokenKind.Int, text, start, this.makePos(), parseInt(text, 10));
+  }
+
+  private isHexDigit(ch: string): boolean {
+    return (ch >= "0" && ch <= "9") || (ch >= "a" && ch <= "f") || (ch >= "A" && ch <= "F");
   }
 
   private readWord(): void {
