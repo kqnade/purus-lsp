@@ -579,6 +579,10 @@ class Lexer {
     TokenKind.Unless, TokenKind.While, TokenKind.Until,
     TokenKind.For, TokenKind.In,
     TokenKind.Match, TokenKind.When, TokenKind.Throw, TokenKind.Await,
+    TokenKind.Fdiv, TokenKind.Band, TokenKind.Bor, TokenKind.Bxor,
+    TokenKind.Bnot, TokenKind.Shl, TokenKind.Shr, TokenKind.Ushr,
+    TokenKind.Void, TokenKind.Yield, TokenKind.Switch, TokenKind.Case,
+    TokenKind.Do,
   ]);
 
   private isExprStartAfter(prev: Token | undefined): boolean {
