@@ -420,7 +420,8 @@ class Lexer {
         this.advance();
         this.pushToken(TokenKind.BigInt, text, start, this.makePos(), text);
       } else {
-        this.pushToken(TokenKind.Int, text, start, this.makePos(), parseInt(text, 2));
+        const bDigits = isNeg ? text.slice(3) : text.slice(2); // strip [-]0b
+        this.pushToken(TokenKind.Int, text, start, this.makePos(), isNeg ? -parseInt(bDigits, 2) : parseInt(bDigits, 2));
       }
       return;
     }
