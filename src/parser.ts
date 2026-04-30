@@ -518,6 +518,7 @@ class Parser {
       if (this.isAtEnd()) break;
       const level = this.getIndentLevel();
       if (level < blockIndent) break;
+      if (this.check(TokenKind.Indent)) this.advance();
 
       const armStart = this.peek().span.start;
       if (this.check(TokenKind.Case)) {
@@ -1929,6 +1930,7 @@ class Parser {
         if (this.isAtEnd()) break;
         const level = this.getIndentLevel();
         if (level < this.currentIndent) break;
+        if (this.check(TokenKind.Indent)) this.advance();
 
         const armStart = this.peek().span.start;
         if (this.check(TokenKind.Case)) {
