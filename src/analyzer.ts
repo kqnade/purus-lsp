@@ -1,4 +1,4 @@
-import { Program, Stmt, Expr, Param, FnBody, ClassMember, MatchArm } from "./ast";
+import { Program, Stmt, Expr, Param, FnBody, ClassMember, MatchArm, SwitchArm } from "./ast";
 import { Span } from "./token";
 import {
   PurusSymbol, Scope, SymbolKind, ParamInfo,
@@ -203,13 +203,7 @@ class Analyzer {
       case "Switch":
         this.visitExpr(stmt.subject);
         for (const arm of stmt.arms) {
-          if (arm.pattern) this.visitExpr(arm.pattern);
-          if (arm.guard) this.visitExpr(arm.guard);
-          if (Array.isArray(arm.body)) {
-            for (const s of arm.body) this.visitStmt(s);
-          } else {
-            this.visitExpr(arm.body);
-          }
+          this.visitSwitchArm(arm);
         }
         break;
 
@@ -418,13 +412,7 @@ class Analyzer {
       case "SwitchExpr":
         this.visitExpr(expr.subject);
         for (const arm of expr.arms) {
-          if (arm.pattern) this.visitExpr(arm.pattern);
-          if (arm.guard) this.visitExpr(arm.guard);
-          if (Array.isArray(arm.body)) {
-            for (const s of arm.body) this.visitStmt(s);
-          } else {
-            this.visitExpr(arm.body);
-          }
+          this.visitSwitchArm(arm);
         }
         break;
 
@@ -613,6 +601,16 @@ class Analyzer {
       this.visitBlock(arm.body.stmts, arm.span);
     } else {
       this.visitExpr(arm.body.expr);
+    }
+  }
+
+  private visitSwitchArm(arm: SwitchArm): void {
+    if (arm.pattern) this.visitExpr(arm.pattern);
+    if (arm.guard) this.visitExpr(arm.guard);
+    if (Array.isArray(arm.body)) {
+      this.visitBlock(arm.body, arm.span);
+    } else {
+      this.visitExpr(arm.body);
     }
   }
 
