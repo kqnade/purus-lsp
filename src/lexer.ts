@@ -411,9 +411,15 @@ class Lexer {
       this.advance();
       text += this.source[this.pos];
       this.advance();
+      const digitStart = this.pos;
       while (this.pos < this.source.length && (this.source[this.pos] === "0" || this.source[this.pos] === "1")) {
         text += this.source[this.pos];
         this.advance();
+      }
+      if (this.pos === digitStart) {
+        text = this.readInvalidNumberSuffix(text);
+        this.pushToken(TokenKind.Error, text, start, this.makePos());
+        return;
       }
       if (this.pos < this.source.length && this.source[this.pos] === "n") {
         text += "n";
@@ -433,9 +439,15 @@ class Lexer {
       this.advance();
       text += this.source[this.pos];
       this.advance();
+      const digitStart = this.pos;
       while (this.pos < this.source.length && this.isHexDigit(this.source[this.pos])) {
         text += this.source[this.pos];
         this.advance();
+      }
+      if (this.pos === digitStart) {
+        text = this.readInvalidNumberSuffix(text);
+        this.pushToken(TokenKind.Error, text, start, this.makePos());
+        return;
       }
       if (this.pos < this.source.length && this.source[this.pos] === "n") {
         text += "n";
@@ -474,6 +486,14 @@ class Lexer {
     }
 
     this.pushToken(TokenKind.Int, text, start, this.makePos(), parseInt(text, 10));
+  }
+
+  private readInvalidNumberSuffix(text: string): string {
+    while (this.pos < this.source.length && this.isIdentChar(this.source[this.pos])) {
+      text += this.source[this.pos];
+      this.advance();
+    }
+    return text;
   }
 
   private isHexDigit(ch: string): boolean {
