@@ -493,6 +493,7 @@ class Parser {
     this.advance(); // do
     const body = this.parseBlock();
     this.skipNewlines();
+    if (this.check(TokenKind.Indent)) this.advance();
     this.expect(TokenKind.While, "Expected 'while' after 'do' block");
     const condition = this.parseExpression();
     return { type: "DoWhile", condition, body, span: this.spanFrom(start) };
@@ -1456,7 +1457,9 @@ class Parser {
       this.advance();
       const token = this.peek();
       if (token.kind === TokenKind.Newline || token.kind === TokenKind.Eof ||
-          token.kind === TokenKind.RBracket || token.kind === TokenKind.Indent) {
+          token.kind === TokenKind.RBracket || token.kind === TokenKind.Indent ||
+          token.kind === TokenKind.Comma || token.kind === TokenKind.Semicolon ||
+          token.kind === TokenKind.Else) {
         return { type: "Yield", span: this.spanFrom(start) };
       }
       const expr = this.parseExpression();
