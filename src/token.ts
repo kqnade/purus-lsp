@@ -252,7 +252,6 @@ export const KEYWORDS: ReadonlyMap<string, TokenKind> = new Map([
   ["void", TokenKind.Void],
   ["infinity", TokenKind.Infinity],
   ["function", TokenKind.Fn],
-  ["protected", TokenKind.Private],
   ["try", TokenKind.Try],
   ["catch", TokenKind.Catch],
   ["finally", TokenKind.Finally],
