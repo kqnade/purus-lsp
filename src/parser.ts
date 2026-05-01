@@ -2,6 +2,7 @@ import { Token, TokenKind, Span, Position } from "./token";
 import {
   Program, Stmt, Expr, Param, FnBody, MatchArm, MatchArmBody,
   ClassMember, ObjectEntry, BinaryOp, PostfixModifier, ImportAttribute,
+  SwitchArm, SwitchExpr,
 } from "./ast";
 
 export interface ParseError {
@@ -87,6 +88,10 @@ class Parser {
         return this.parseUntilStmt();
       case TokenKind.For:
         return this.parseForStmt();
+      case TokenKind.Do:
+        return this.parseDoWhileStmt();
+      case TokenKind.Switch:
+        return this.parseSwitchStmt();
       case TokenKind.Match:
         return this.parseMatchStmt();
       case TokenKind.Try:
@@ -220,6 +225,7 @@ class Parser {
       returnType,
       body,
       isAsync,
+      isGenerator: false,
       span: this.spanFrom(start),
     };
   }
@@ -256,6 +262,11 @@ class Parser {
   private parseFnBody(): FnBody {
     if (this.check(TokenKind.To)) {
       this.advance();
+      if (this.check(TokenKind.Return)) {
+        this.advance();
+        const expr = this.parseExpression();
+        return { kind: "toReturn", expr };
+      }
       const expr = this.parseExpression();
       return { kind: "expr", expr };
     }
@@ -399,6 +410,11 @@ class Parser {
     const start = this.peek().span.start;
     this.advance(); // for
 
+    // JS-style for loop: for let/const/var i be 0; cond; update
+    if (this.check(TokenKind.Let) || this.check(TokenKind.Const) || this.check(TokenKind.Var)) {
+      return this.parseForClassicStmt(start);
+    }
+
     const firstIdent = this.expect(TokenKind.Ident, "Expected variable name");
 
     // for i; item in ... (with index)
@@ -470,6 +486,85 @@ class Parser {
       body,
       span: this.spanFrom(start),
     };
+  }
+
+  private parseDoWhileStmt(): Stmt {
+    const start = this.peek().span.start;
+    this.advance(); // do
+    const body = this.parseBlock();
+    this.skipNewlines();
+    if (this.check(TokenKind.Indent)) this.advance();
+    this.expect(TokenKind.While, "Expected 'while' after 'do' block");
+    const condition = this.parseExpression();
+    return { type: "DoWhile", condition, body, span: this.spanFrom(start) };
+  }
+
+  private parseSwitchStmt(): Stmt {
+    const start = this.peek().span.start;
+    this.advance(); // switch
+    const subject = this.parseExpression();
+    this.skipNewlines();
+
+    const arms: SwitchArm[] = [];
+    const blockIndent = this.getIndentLevel();
+    if (blockIndent <= this.currentIndent) {
+      return { type: "Switch", subject, arms, span: this.spanFrom(start) };
+    }
+
+    const prevIndent = this.currentIndent;
+    this.currentIndent = blockIndent;
+
+    while (true) {
+      this.skipNewlines();
+      if (this.isAtEnd()) break;
+      const level = this.getIndentLevel();
+      if (level < blockIndent) break;
+      if (this.check(TokenKind.Indent)) this.advance();
+
+      const armStart = this.peek().span.start;
+      if (this.check(TokenKind.Case)) {
+        this.advance(); // case
+        const pattern = this.parseExpression();
+        let guard: Expr | undefined;
+        if (this.check(TokenKind.If)) {
+          this.advance();
+          guard = this.parseExpression();
+        }
+        const body = this.parseSwitchArmBody();
+        arms.push({ pattern, guard, body, span: this.spanFrom(armStart) });
+      } else if (this.check(TokenKind.Default)) {
+        this.advance(); // default
+        const body = this.parseSwitchArmBody();
+        arms.push({ body, span: this.spanFrom(armStart) });
+      } else {
+        break;
+      }
+    }
+
+    this.currentIndent = prevIndent;
+    return { type: "Switch", subject, arms, span: this.spanFrom(start) };
+  }
+
+  private parseSwitchArmBody(): Stmt[] | Expr {
+    if (this.check(TokenKind.Then)) {
+      this.advance();
+      return this.parseExpression();
+    }
+    return this.parseBlock();
+  }
+
+  private parseForClassicStmt(start: Position): Stmt {
+    const init = this.parseVarDecl();
+    this.skipSemicolon();
+    const condition = this.parseExpression();
+    this.skipSemicolon();
+    const update = this.parseExprStatement();
+    const body = this.parseBlock();
+    return { type: "ForClassic", init, condition, update, body, span: this.spanFrom(start) };
+  }
+
+  private skipSemicolon(): void {
+    if (this.check(TokenKind.Semicolon)) this.advance();
   }
 
   private parseMatchStmt(): Stmt {
@@ -995,6 +1090,34 @@ class Parser {
       return this.maybePostfix(stmt);
     }
 
+    // Compound assignments: x add be 1, x sub be 1, etc.
+    const compoundOps: [TokenKind, BinaryOp][] = [
+      [TokenKind.Add, "add"], [TokenKind.Sub, "sub"],
+      [TokenKind.Mul, "mul"], [TokenKind.Div, "div"],
+      [TokenKind.Mod, "mod"], [TokenKind.Pow, "pow"],
+      [TokenKind.Fdiv, "fdiv"],
+      [TokenKind.Band, "band"], [TokenKind.Bor, "bor"],
+      [TokenKind.Bxor, "bxor"], [TokenKind.Shl, "shl"],
+      [TokenKind.Shr, "shr"], [TokenKind.Ushr, "ushr"],
+      [TokenKind.And, "and"], [TokenKind.Or, "or"],
+      [TokenKind.Coal, "coal"],
+    ];
+    for (const [kind, op] of compoundOps) {
+      if (this.check(kind) && this.peekAt(1)?.kind === TokenKind.Be) {
+        this.advance(); // op keyword
+        this.advance(); // be
+        const value = this.parseExpression();
+        const stmt: Stmt = {
+          type: "CompoundAssign",
+          op,
+          target: expr,
+          value,
+          span: this.spanFrom(start),
+        };
+        return this.maybePostfix(stmt);
+      }
+    }
+
     const stmt: Stmt = {
       type: "ExprStmt",
       expr,
@@ -1029,7 +1152,7 @@ class Parser {
   private parseCoal(): Expr {
     let left = this.parseOr();
 
-    while (this.check(TokenKind.Coal)) {
+    while (this.check(TokenKind.Coal) && this.peekAt(1)?.kind !== TokenKind.Be) {
       this.advance();
       const right = this.parseOr();
       left = {
@@ -1046,7 +1169,7 @@ class Parser {
   private parseOr(): Expr {
     let left = this.parseAnd();
 
-    while (this.check(TokenKind.Or)) {
+    while (this.check(TokenKind.Or) && this.peekAt(1)?.kind !== TokenKind.Be) {
       this.advance();
       const right = this.parseAnd();
       left = {
@@ -1062,11 +1185,11 @@ class Parser {
   }
 
   private parseAnd(): Expr {
-    let left = this.parseEquality();
+    let left = this.parseBitOr();
 
-    while (this.check(TokenKind.And)) {
+    while (this.check(TokenKind.And) && this.peekAt(1)?.kind !== TokenKind.Be) {
       this.advance();
-      const right = this.parseEquality();
+      const right = this.parseBitOr();
       left = {
         type: "BinOp",
         op: "and",
@@ -1074,6 +1197,42 @@ class Parser {
         right,
         span: this.mergeSpans(left.span, right.span),
       };
+    }
+
+    return left;
+  }
+
+  private parseBitOr(): Expr {
+    let left = this.parseBitXor();
+
+    while (this.check(TokenKind.Bor) && this.peekAt(1)?.kind !== TokenKind.Be) {
+      this.advance();
+      const right = this.parseBitXor();
+      left = { type: "BinOp", op: "bor", left, right, span: this.mergeSpans(left.span, right.span) };
+    }
+
+    return left;
+  }
+
+  private parseBitXor(): Expr {
+    let left = this.parseBitAnd();
+
+    while (this.check(TokenKind.Bxor) && this.peekAt(1)?.kind !== TokenKind.Be) {
+      this.advance();
+      const right = this.parseBitAnd();
+      left = { type: "BinOp", op: "bxor", left, right, span: this.mergeSpans(left.span, right.span) };
+    }
+
+    return left;
+  }
+
+  private parseBitAnd(): Expr {
+    let left = this.parseEquality();
+
+    while (this.check(TokenKind.Band) && this.peekAt(1)?.kind !== TokenKind.Be) {
+      this.advance();
+      const right = this.parseEquality();
+      left = { type: "BinOp", op: "band", left, right, span: this.mergeSpans(left.span, right.span) };
     }
 
     return left;
@@ -1113,37 +1272,61 @@ class Parser {
   }
 
   private parseComparison(): Expr {
-    let left = this.parseAddition();
+    let left = this.parseShift();
 
     while (true) {
       if (this.check(TokenKind.Lt)) {
         this.advance();
         if (this.check(TokenKind.Eq)) {
           this.advance();
-          const right = this.parseAddition();
+          const right = this.parseShift();
           left = { type: "BinOp", op: "le", left, right, span: this.mergeSpans(left.span, right.span) };
         } else {
-          const right = this.parseAddition();
+          const right = this.parseShift();
           left = { type: "BinOp", op: "lt", left, right, span: this.mergeSpans(left.span, right.span) };
         }
       } else if (this.check(TokenKind.Gt)) {
         this.advance();
         if (this.check(TokenKind.Eq)) {
           this.advance();
-          const right = this.parseAddition();
+          const right = this.parseShift();
           left = { type: "BinOp", op: "ge", left, right, span: this.mergeSpans(left.span, right.span) };
         } else {
-          const right = this.parseAddition();
+          const right = this.parseShift();
           left = { type: "BinOp", op: "gt", left, right, span: this.mergeSpans(left.span, right.span) };
         }
       } else if (this.check(TokenKind.Le)) {
         this.advance();
-        const right = this.parseAddition();
+        const right = this.parseShift();
         left = { type: "BinOp", op: "le", left, right, span: this.mergeSpans(left.span, right.span) };
       } else if (this.check(TokenKind.Ge)) {
         this.advance();
-        const right = this.parseAddition();
+        const right = this.parseShift();
         left = { type: "BinOp", op: "ge", left, right, span: this.mergeSpans(left.span, right.span) };
+      } else {
+        break;
+      }
+    }
+
+    return left;
+  }
+
+  private parseShift(): Expr {
+    let left = this.parseAddition();
+
+    while (true) {
+      if (this.check(TokenKind.Shl) && this.peekAt(1)?.kind !== TokenKind.Be) {
+        this.advance();
+        const right = this.parseAddition();
+        left = { type: "BinOp", op: "shl", left, right, span: this.mergeSpans(left.span, right.span) };
+      } else if (this.check(TokenKind.Shr) && this.peekAt(1)?.kind !== TokenKind.Be) {
+        this.advance();
+        const right = this.parseAddition();
+        left = { type: "BinOp", op: "shr", left, right, span: this.mergeSpans(left.span, right.span) };
+      } else if (this.check(TokenKind.Ushr) && this.peekAt(1)?.kind !== TokenKind.Be) {
+        this.advance();
+        const right = this.parseAddition();
+        left = { type: "BinOp", op: "ushr", left, right, span: this.mergeSpans(left.span, right.span) };
       } else {
         break;
       }
@@ -1156,11 +1339,11 @@ class Parser {
     let left = this.parseMultiplication();
 
     while (true) {
-      if (this.check(TokenKind.Add)) {
+      if (this.check(TokenKind.Add) && this.peekAt(1)?.kind !== TokenKind.Be) {
         this.advance();
         const right = this.parseMultiplication();
         left = { type: "BinOp", op: "add", left, right, span: this.mergeSpans(left.span, right.span) };
-      } else if (this.check(TokenKind.Sub)) {
+      } else if (this.check(TokenKind.Sub) && this.peekAt(1)?.kind !== TokenKind.Be) {
         this.advance();
         const right = this.parseMultiplication();
         left = { type: "BinOp", op: "sub", left, right, span: this.mergeSpans(left.span, right.span) };
@@ -1176,18 +1359,22 @@ class Parser {
     let left = this.parsePower();
 
     while (true) {
-      if (this.check(TokenKind.Mul)) {
+      if (this.check(TokenKind.Mul) && this.peekAt(1)?.kind !== TokenKind.Be) {
         this.advance();
         const right = this.parsePower();
         left = { type: "BinOp", op: "mul", left, right, span: this.mergeSpans(left.span, right.span) };
-      } else if (this.check(TokenKind.Div)) {
+      } else if (this.check(TokenKind.Div) && this.peekAt(1)?.kind !== TokenKind.Be) {
         this.advance();
         const right = this.parsePower();
         left = { type: "BinOp", op: "div", left, right, span: this.mergeSpans(left.span, right.span) };
-      } else if (this.check(TokenKind.Mod)) {
+      } else if (this.check(TokenKind.Mod) && this.peekAt(1)?.kind !== TokenKind.Be) {
         this.advance();
         const right = this.parsePower();
         left = { type: "BinOp", op: "mod", left, right, span: this.mergeSpans(left.span, right.span) };
+      } else if (this.check(TokenKind.Fdiv) && this.peekAt(1)?.kind !== TokenKind.Be) {
+        this.advance();
+        const right = this.parsePower();
+        left = { type: "BinOp", op: "fdiv", left, right, span: this.mergeSpans(left.span, right.span) };
       } else {
         break;
       }
@@ -1199,7 +1386,7 @@ class Parser {
   private parsePower(): Expr {
     const base = this.parseUnary();
 
-    if (this.check(TokenKind.Pow)) {
+    if (this.check(TokenKind.Pow) && this.peekAt(1)?.kind !== TokenKind.Be) {
       this.advance();
       const exp = this.parsePower(); // right-associative
       return { type: "BinOp", op: "pow", left: base, right: exp, span: this.mergeSpans(base.span, exp.span) };
@@ -1215,6 +1402,13 @@ class Parser {
       this.advance();
       const operand = this.parseUnary();
       return { type: "Unary", op: "not", operand, span: this.spanFrom(start) };
+    }
+
+    // neg infinity → -Infinity (must precede general neg case)
+    if (this.check(TokenKind.Neg) && this.peekAt(1)?.kind === TokenKind.Infinity) {
+      this.advance(); // neg
+      this.advance(); // infinity
+      return { type: "InfinityLit", negative: true, span: this.spanFrom(start) };
     }
 
     if (this.check(TokenKind.Neg)) {
@@ -1245,6 +1439,47 @@ class Parser {
       this.advance();
       const expr = this.parseUnary();
       return { type: "DeleteExpr", expr, span: this.spanFrom(start) };
+    }
+
+    if (this.check(TokenKind.Bnot)) {
+      this.advance();
+      const operand = this.parseUnary();
+      return { type: "Unary", op: "bnot", operand, span: this.spanFrom(start) };
+    }
+
+    if (this.check(TokenKind.Void)) {
+      this.advance();
+      const operand = this.parseUnary();
+      return { type: "Unary", op: "void", operand, span: this.spanFrom(start) };
+    }
+
+    if (this.check(TokenKind.Yield)) {
+      this.advance();
+      const token = this.peek();
+      if (token.kind === TokenKind.Newline || token.kind === TokenKind.Eof ||
+          token.kind === TokenKind.RBracket || token.kind === TokenKind.Indent ||
+          token.kind === TokenKind.Comma || token.kind === TokenKind.Semicolon ||
+          token.kind === TokenKind.Else) {
+        return { type: "Yield", span: this.spanFrom(start) };
+      }
+      const expr = this.parseExpression();
+      return { type: "Yield", expr, span: this.spanFrom(start) };
+    }
+
+    // add\x → prefix increment (++x)
+    if (this.check(TokenKind.Add) && this.peekAt(1)?.kind === TokenKind.Backslash) {
+      this.advance(); // add
+      this.advance(); // backslash
+      const operand = this.parseUnary();
+      return { type: "PreInc", operand, span: this.spanFrom(start) };
+    }
+
+    // sub\x → prefix decrement (--x)
+    if (this.check(TokenKind.Sub) && this.peekAt(1)?.kind === TokenKind.Backslash) {
+      this.advance(); // sub
+      this.advance(); // backslash
+      const operand = this.parseUnary();
+      return { type: "PreDec", operand, span: this.spanFrom(start) };
     }
 
     return this.parsePostfix();
@@ -1356,6 +1591,23 @@ class Parser {
         continue;
       }
 
+      // x\add → postfix increment (x++), x\sub → postfix decrement (x--)
+      if (this.check(TokenKind.Backslash)) {
+        const next = this.peekAt(1);
+        if (next?.kind === TokenKind.Add) {
+          this.advance(); // backslash
+          this.advance(); // add
+          expr = { type: "PostInc", operand: expr, span: this.mergeSpans(expr.span, this.prevSpan()) };
+          continue;
+        }
+        if (next?.kind === TokenKind.Sub) {
+          this.advance(); // backslash
+          this.advance(); // sub
+          expr = { type: "PostDec", operand: expr, span: this.mergeSpans(expr.span, this.prevSpan()) };
+          continue;
+        }
+      }
+
       break;
     }
 
@@ -1405,6 +1657,14 @@ class Parser {
       case TokenKind.Nan: {
         this.advance();
         return { type: "NanLit", span: token.span };
+      }
+      case TokenKind.Infinity: {
+        this.advance();
+        return { type: "InfinityLit", negative: false, span: token.span };
+      }
+      case TokenKind.BigInt: {
+        this.advance();
+        return { type: "BigIntLit", raw: token.text, span: token.span };
       }
       case TokenKind.This: {
         this.advance();
@@ -1466,6 +1726,11 @@ class Parser {
       // Match expression
       case TokenKind.Match: {
         return this.parseMatchExpr();
+      }
+
+      // Switch expression
+      case TokenKind.Switch: {
+        return this.parseSwitchExpr();
       }
 
       // Try expression
@@ -1585,6 +1850,7 @@ class Parser {
       returnType,
       body,
       isAsync,
+      isGenerator: false,
       span: this.spanFrom(start),
     };
   }
@@ -1647,6 +1913,53 @@ class Parser {
       arms,
       span: this.spanFrom(start),
     };
+  }
+
+  private parseSwitchExpr(): SwitchExpr {
+    const start = this.peek().span.start;
+    this.advance(); // switch
+    const subject = this.parseExpression();
+    this.skipNewlines();
+
+    const arms: SwitchArm[] = [];
+    const blockIndent = this.getIndentLevel();
+
+    if (blockIndent > this.currentIndent) {
+      const prevIndent = this.currentIndent;
+      this.currentIndent = blockIndent;
+
+      while (!this.isAtEnd()) {
+        this.skipNewlines();
+        if (this.isAtEnd()) break;
+        const level = this.getIndentLevel();
+        if (level < this.currentIndent) break;
+        if (this.check(TokenKind.Indent)) this.advance();
+
+        const armStart = this.peek().span.start;
+        if (this.check(TokenKind.Case)) {
+          this.advance();
+          const pattern = this.parseExpression();
+          let guard: Expr | undefined;
+          if (this.check(TokenKind.If)) {
+            this.advance();
+            guard = this.parseExpression();
+          }
+          const body = this.parseSwitchArmBody();
+          arms.push({ pattern, guard, body, span: this.spanFrom(armStart) });
+        } else if (this.check(TokenKind.Default)) {
+          this.advance();
+          const body = this.parseSwitchArmBody();
+          arms.push({ body, span: this.spanFrom(armStart) });
+          break;
+        } else {
+          break;
+        }
+      }
+
+      this.currentIndent = prevIndent;
+    }
+
+    return { type: "SwitchExpr", subject, arms, span: this.spanFrom(start) };
   }
 
   private parseTryExpr(): Expr {
