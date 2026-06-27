@@ -2,6 +2,7 @@ import { Token, TokenKind, Span, Position } from "./token";
 import {
   Program, Stmt, Expr, Param, FnBody, MatchArm, MatchArmBody,
   ClassMember, ObjectEntry, BinaryOp, PostfixModifier, ImportAttribute,
+  SwitchCase, type CompoundAssignOp,
 } from "./ast";
 
 export interface ParseError {
@@ -72,11 +73,13 @@ class Parser {
         return this.parseVarDecl();
       case TokenKind.Fn:
         return this.parseFnDecl(false);
-      case TokenKind.Async:
-        if (this.peekAt(1)?.kind === TokenKind.Fn) {
+      case TokenKind.Async: {
+        const next = this.peekAt(1)?.kind;
+        if (next === TokenKind.Fn || next === TokenKind.Function) {
           return this.parseFnDecl(true);
         }
         return this.parseExprStatement();
+      }
       case TokenKind.If:
         return this.parseIfStmt();
       case TokenKind.Unless:
@@ -85,10 +88,16 @@ class Parser {
         return this.parseWhileStmt();
       case TokenKind.Until:
         return this.parseUntilStmt();
+      case TokenKind.Do:
+        return this.parseDoWhile();
       case TokenKind.For:
         return this.parseForStmt();
       case TokenKind.Match:
         return this.parseMatchStmt();
+      case TokenKind.Switch:
+        return this.parseSwitchStmt();
+      case TokenKind.Function:
+        return this.parseFnDecl(false);
       case TokenKind.Try:
         return this.parseTryCatch();
       case TokenKind.Throw:
@@ -107,8 +116,8 @@ class Parser {
         return this.parseFromUse();
       case TokenKind.Export:
         return this.parseExport();
-      case TokenKind.Pub:
-        return this.parsePub();
+      case TokenKind.Public:
+        return this.parsePublic();
       case TokenKind.Namespace:
         return this.parseNamespace();
       case TokenKind.Class:
@@ -198,7 +207,7 @@ class Parser {
   private parseFnDecl(isAsync: boolean): FnDeclStmt {
     const start = this.peek().span.start;
     if (isAsync) this.advance(); // async
-    this.advance(); // fn
+    this.advance(); // fn / function
 
     // Named function: fn name params body
     const nameToken = this.expect(TokenKind.Ident, "Expected function name");
@@ -393,6 +402,63 @@ class Parser {
     const condition = this.parseExpression();
     const body = this.parseBlock();
     return { type: "Until", condition, body, span: this.spanFrom(start) };
+  }
+
+  private parseDoWhile(): Stmt {
+    const start = this.peek().span.start;
+    this.advance(); // do
+    const body = this.parseBlock();
+    this.skipNewlines();
+    if (this.check(TokenKind.Indent)) this.advance();
+    this.expect(TokenKind.While, "Expected 'while'");
+    const condition = this.parseExpression();
+    return { type: "DoWhile", body, condition, span: this.spanFrom(start) };
+  }
+
+  private parseSwitchStmt(): Stmt {
+    const start = this.peek().span.start;
+    this.advance(); // switch
+    const subject = this.parseExpression();
+    this.skipNewlines();
+
+    const cases: SwitchCase[] = [];
+    let defaultBody: Stmt[] | undefined;
+
+    const blockIndent = this.getIndentLevel();
+    if (blockIndent <= this.currentIndent) {
+      return { type: "Switch", subject, cases, span: this.spanFrom(start) };
+    }
+
+    const prevIndent = this.currentIndent;
+    this.currentIndent = blockIndent;
+
+    while (!this.isAtEnd()) {
+      this.skipNewlines();
+      if (this.isAtEnd()) break;
+
+      const savedPos = this.pos;
+      const indent = this.getIndentLevel();
+      if (indent < this.currentIndent) break;
+      if (this.check(TokenKind.Indent)) this.advance();
+
+      if (this.check(TokenKind.Case)) {
+        const caseStart = this.peek().span.start;
+        this.advance(); // case
+        const value = this.parseExpression();
+        const body = this.parseMatchArmBody();
+        cases.push({ value, body, span: this.spanFrom(caseStart) });
+      } else if (this.check(TokenKind.Default)) {
+        this.advance(); // default
+        defaultBody = this.parseBlock();
+        break;
+      } else {
+        this.pos = savedPos;
+        break;
+      }
+    }
+
+    this.currentIndent = prevIndent;
+    return { type: "Switch", subject, cases, defaultBody, span: this.spanFrom(start) };
   }
 
   private parseForStmt(): Stmt {
@@ -759,15 +825,15 @@ class Parser {
     return { type: "Export", decl, span: this.spanFrom(start) };
   }
 
-  private parsePub(): Stmt {
+  private parsePublic(): Stmt {
     const start = this.peek().span.start;
-    this.advance(); // pub
+    this.advance(); // public
     const decl = this.parseStatement();
     if (!decl) {
-      this.addError("Expected declaration after 'pub'");
+      this.addError("Expected declaration after 'public'");
       return { type: "ExprStmt", expr: this.dummyExpr(), span: this.spanFrom(start) };
     }
-    return { type: "Pub", decl, span: this.spanFrom(start) };
+    return { type: "Public", decl, span: this.spanFrom(start) };
   }
 
   private parseNamespace(): Stmt {
@@ -836,8 +902,8 @@ class Parser {
   private parseClassMember(): ClassMember | null {
     const start = this.peek().span.start;
 
-    // private field
-    if (this.check(TokenKind.Private)) {
+    // private field (protected is a deprecated alias)
+    if (this.check(TokenKind.Private) || this.check(TokenKind.Protected)) {
       this.advance();
       const nameToken = this.expect(TokenKind.Ident, "Expected field name");
       let init: Expr | undefined;
@@ -855,9 +921,10 @@ class Parser {
     }
 
     // getter: get fn name ...
-    if (this.check(TokenKind.Get) && this.peekAt(1)?.kind === TokenKind.Fn) {
+    if (this.check(TokenKind.Get) &&
+        (this.peekAt(1)?.kind === TokenKind.Fn || this.peekAt(1)?.kind === TokenKind.Function)) {
       this.advance(); // get
-      this.advance(); // fn
+      this.advance(); // fn / function
       const nameToken = this.expect(TokenKind.Ident, "Expected getter name");
       let returnType: string | undefined;
       if (this.check(TokenKind.Gives)) {
@@ -876,9 +943,10 @@ class Parser {
     }
 
     // setter: set fn name param ...
-    if (this.check(TokenKind.Set) && this.peekAt(1)?.kind === TokenKind.Fn) {
+    if (this.check(TokenKind.Set) &&
+        (this.peekAt(1)?.kind === TokenKind.Fn || this.peekAt(1)?.kind === TokenKind.Function)) {
       this.advance(); // set
-      this.advance(); // fn
+      this.advance(); // fn / function
       const nameToken = this.expect(TokenKind.Ident, "Expected setter name");
       const paramName = this.expect(TokenKind.Ident, "Expected parameter name").text;
       const body = this.parseFnBody();
@@ -906,7 +974,7 @@ class Parser {
       this.advance();
     }
 
-    if (this.check(TokenKind.Fn)) {
+    if (this.check(TokenKind.Fn) || this.check(TokenKind.Function)) {
       this.advance();
 
       // Constructor: fn new[params]
@@ -978,6 +1046,15 @@ class Parser {
     return { type: "Delete", expr, span: this.spanFrom(start) };
   }
 
+  private isCompoundOp(kind: TokenKind): boolean {
+    return [
+      TokenKind.Add, TokenKind.Sub, TokenKind.Mul, TokenKind.Div,
+      TokenKind.Mod, TokenKind.Pow, TokenKind.Fdiv,
+      TokenKind.Band, TokenKind.Bor, TokenKind.Bxor,
+      TokenKind.Shl, TokenKind.Shr, TokenKind.Ushr,
+    ].includes(kind);
+  }
+
   private parseExprStatement(): Stmt {
     const start = this.peek().span.start;
     const expr = this.parseExpression();
@@ -993,6 +1070,20 @@ class Parser {
         span: this.spanFrom(start),
       };
       return this.maybePostfix(stmt);
+    }
+
+    // Compound assignment: target op be value (e.g. x add be 5 → x += 5)
+    if (this.isCompoundOp(this.peek().kind) && this.peekAt(1)?.kind === TokenKind.Be) {
+      const opToken = this.advance(); // the op
+      this.advance(); // be
+      const value = this.parseExpression();
+      return {
+        type: "CompoundAssign",
+        target: expr,
+        op: opToken.text as CompoundAssignOp,
+        value,
+        span: this.spanFrom(start),
+      };
     }
 
     const stmt: Stmt = {
@@ -1062,11 +1153,11 @@ class Parser {
   }
 
   private parseAnd(): Expr {
-    let left = this.parseEquality();
+    let left = this.parseBitOr();
 
     while (this.check(TokenKind.And)) {
       this.advance();
-      const right = this.parseEquality();
+      const right = this.parseBitOr();
       left = {
         type: "BinOp",
         op: "and",
@@ -1074,6 +1165,42 @@ class Parser {
         right,
         span: this.mergeSpans(left.span, right.span),
       };
+    }
+
+    return left;
+  }
+
+  private parseBitOr(): Expr {
+    let left = this.parseBitXor();
+
+    while (this.check(TokenKind.Bor) && this.peekAt(1)?.kind !== TokenKind.Be) {
+      this.advance();
+      const right = this.parseBitXor();
+      left = { type: "BinOp", op: "bor", left, right, span: this.mergeSpans(left.span, right.span) };
+    }
+
+    return left;
+  }
+
+  private parseBitXor(): Expr {
+    let left = this.parseBitAnd();
+
+    while (this.check(TokenKind.Bxor) && this.peekAt(1)?.kind !== TokenKind.Be) {
+      this.advance();
+      const right = this.parseBitAnd();
+      left = { type: "BinOp", op: "bxor", left, right, span: this.mergeSpans(left.span, right.span) };
+    }
+
+    return left;
+  }
+
+  private parseBitAnd(): Expr {
+    let left = this.parseEquality();
+
+    while (this.check(TokenKind.Band) && this.peekAt(1)?.kind !== TokenKind.Be) {
+      this.advance();
+      const right = this.parseEquality();
+      left = { type: "BinOp", op: "band", left, right, span: this.mergeSpans(left.span, right.span) };
     }
 
     return left;
@@ -1096,10 +1223,6 @@ class Parser {
         this.advance(); // eq
         const right = this.parseComparison();
         left = { type: "BinOp", op: "neq", left, right, span: this.mergeSpans(left.span, right.span) };
-      } else if (this.check(TokenKind.Is)) {
-        this.advance();
-        const typeToken = this.expect(TokenKind.Ident, "Expected type name");
-        left = { type: "IsCheck", expr: left, typeName: typeToken.text, span: this.mergeSpans(left.span, typeToken.span) };
       } else if (this.check(TokenKind.Instanceof)) {
         this.advance();
         const classToken = this.expect(TokenKind.Ident, "Expected class name");
@@ -1113,37 +1236,61 @@ class Parser {
   }
 
   private parseComparison(): Expr {
-    let left = this.parseAddition();
+    let left = this.parseShift();
 
     while (true) {
       if (this.check(TokenKind.Lt)) {
         this.advance();
         if (this.check(TokenKind.Eq)) {
           this.advance();
-          const right = this.parseAddition();
+          const right = this.parseShift();
           left = { type: "BinOp", op: "le", left, right, span: this.mergeSpans(left.span, right.span) };
         } else {
-          const right = this.parseAddition();
+          const right = this.parseShift();
           left = { type: "BinOp", op: "lt", left, right, span: this.mergeSpans(left.span, right.span) };
         }
       } else if (this.check(TokenKind.Gt)) {
         this.advance();
         if (this.check(TokenKind.Eq)) {
           this.advance();
-          const right = this.parseAddition();
+          const right = this.parseShift();
           left = { type: "BinOp", op: "ge", left, right, span: this.mergeSpans(left.span, right.span) };
         } else {
-          const right = this.parseAddition();
+          const right = this.parseShift();
           left = { type: "BinOp", op: "gt", left, right, span: this.mergeSpans(left.span, right.span) };
         }
       } else if (this.check(TokenKind.Le)) {
         this.advance();
-        const right = this.parseAddition();
+        const right = this.parseShift();
         left = { type: "BinOp", op: "le", left, right, span: this.mergeSpans(left.span, right.span) };
       } else if (this.check(TokenKind.Ge)) {
         this.advance();
-        const right = this.parseAddition();
+        const right = this.parseShift();
         left = { type: "BinOp", op: "ge", left, right, span: this.mergeSpans(left.span, right.span) };
+      } else {
+        break;
+      }
+    }
+
+    return left;
+  }
+
+  private parseShift(): Expr {
+    let left = this.parseAddition();
+
+    while (true) {
+      if (this.check(TokenKind.Shl) && this.peekAt(1)?.kind !== TokenKind.Be) {
+        this.advance();
+        const right = this.parseAddition();
+        left = { type: "BinOp", op: "shl", left, right, span: this.mergeSpans(left.span, right.span) };
+      } else if (this.check(TokenKind.Shr) && this.peekAt(1)?.kind !== TokenKind.Be) {
+        this.advance();
+        const right = this.parseAddition();
+        left = { type: "BinOp", op: "shr", left, right, span: this.mergeSpans(left.span, right.span) };
+      } else if (this.check(TokenKind.Ushr) && this.peekAt(1)?.kind !== TokenKind.Be) {
+        this.advance();
+        const right = this.parseAddition();
+        left = { type: "BinOp", op: "ushr", left, right, span: this.mergeSpans(left.span, right.span) };
       } else {
         break;
       }
@@ -1156,11 +1303,11 @@ class Parser {
     let left = this.parseMultiplication();
 
     while (true) {
-      if (this.check(TokenKind.Add)) {
+      if (this.check(TokenKind.Add) && this.peekAt(1)?.kind !== TokenKind.Be) {
         this.advance();
         const right = this.parseMultiplication();
         left = { type: "BinOp", op: "add", left, right, span: this.mergeSpans(left.span, right.span) };
-      } else if (this.check(TokenKind.Sub)) {
+      } else if (this.check(TokenKind.Sub) && this.peekAt(1)?.kind !== TokenKind.Be) {
         this.advance();
         const right = this.parseMultiplication();
         left = { type: "BinOp", op: "sub", left, right, span: this.mergeSpans(left.span, right.span) };
@@ -1176,18 +1323,22 @@ class Parser {
     let left = this.parsePower();
 
     while (true) {
-      if (this.check(TokenKind.Mul)) {
+      if (this.check(TokenKind.Mul) && this.peekAt(1)?.kind !== TokenKind.Be) {
         this.advance();
         const right = this.parsePower();
         left = { type: "BinOp", op: "mul", left, right, span: this.mergeSpans(left.span, right.span) };
-      } else if (this.check(TokenKind.Div)) {
+      } else if (this.check(TokenKind.Div) && this.peekAt(1)?.kind !== TokenKind.Be) {
         this.advance();
         const right = this.parsePower();
         left = { type: "BinOp", op: "div", left, right, span: this.mergeSpans(left.span, right.span) };
-      } else if (this.check(TokenKind.Mod)) {
+      } else if (this.check(TokenKind.Mod) && this.peekAt(1)?.kind !== TokenKind.Be) {
         this.advance();
         const right = this.parsePower();
         left = { type: "BinOp", op: "mod", left, right, span: this.mergeSpans(left.span, right.span) };
+      } else if (this.check(TokenKind.Fdiv) && this.peekAt(1)?.kind !== TokenKind.Be) {
+        this.advance();
+        const right = this.parsePower();
+        left = { type: "BinOp", op: "fdiv", left, right, span: this.mergeSpans(left.span, right.span) };
       } else {
         break;
       }
@@ -1199,7 +1350,7 @@ class Parser {
   private parsePower(): Expr {
     const base = this.parseUnary();
 
-    if (this.check(TokenKind.Pow)) {
+    if (this.check(TokenKind.Pow) && this.peekAt(1)?.kind !== TokenKind.Be) {
       this.advance();
       const exp = this.parsePower(); // right-associative
       return { type: "BinOp", op: "pow", left: base, right: exp, span: this.mergeSpans(base.span, exp.span) };
@@ -1223,6 +1374,12 @@ class Parser {
       return { type: "Unary", op: "neg", operand, span: this.spanFrom(start) };
     }
 
+    if (this.check(TokenKind.Bnot)) {
+      this.advance();
+      const operand = this.parseUnary();
+      return { type: "Unary", op: "bnot", operand, span: this.spanFrom(start) };
+    }
+
     if (this.check(TokenKind.Typeof)) {
       this.advance();
       const expr = this.parseUnary();
@@ -1233,6 +1390,21 @@ class Parser {
       this.advance();
       const expr = this.parseUnary();
       return { type: "Await", expr, span: this.spanFrom(start) };
+    }
+
+    if (this.check(TokenKind.Yield)) {
+      this.advance();
+      if (this.isStatementEnd()) {
+        return { type: "Yield", span: this.spanFrom(start) };
+      }
+      const expr = this.parseExpression();
+      return { type: "Yield", expr, span: this.spanFrom(start) };
+    }
+
+    if (this.check(TokenKind.Void)) {
+      this.advance();
+      const expr = this.parseUnary();
+      return { type: "Void", expr, span: this.spanFrom(start) };
     }
 
     if (this.check(TokenKind.New)) {
@@ -1406,6 +1578,18 @@ class Parser {
         this.advance();
         return { type: "NanLit", span: token.span };
       }
+      case TokenKind.BigInt: {
+        this.advance();
+        return { type: "BigIntLit", value: token.text, span: token.span };
+      }
+      case TokenKind.Infinity: {
+        this.advance();
+        return { type: "InfinityLit", span: token.span };
+      }
+      case TokenKind.Blank: {
+        this.advance();
+        return { type: "Blank", span: token.span };
+      }
       case TokenKind.This: {
         this.advance();
         return { type: "This", span: token.span };
@@ -1445,13 +1629,15 @@ class Parser {
       }
 
       // Function expression: fn params to expr | fn params block
-      case TokenKind.Fn: {
+      case TokenKind.Fn:
+      case TokenKind.Function: {
         return this.parseFnExpr(false);
       }
 
       // Async function expression: async fn ...
       case TokenKind.Async: {
-        if (this.peekAt(1)?.kind === TokenKind.Fn) {
+        const next = this.peekAt(1)?.kind;
+        if (next === TokenKind.Fn || next === TokenKind.Function) {
           return this.parseFnExpr(true);
         }
         this.advance();
@@ -1567,7 +1753,7 @@ class Parser {
   private parseFnExpr(isAsync: boolean): Expr {
     const start = this.peek().span.start;
     if (isAsync) this.advance(); // async
-    this.advance(); // fn
+    this.advance(); // fn / function
 
     const params = this.parseParamList();
 
@@ -1697,11 +1883,14 @@ class Parser {
 
   private parseArgExpr(): Expr {
     // An argument can be a fn expression (inline callback)
-    if (this.check(TokenKind.Fn)) {
+    if (this.check(TokenKind.Fn) || this.check(TokenKind.Function)) {
       return this.parseFnExpr(false);
     }
-    if (this.check(TokenKind.Async) && this.peekAt(1)?.kind === TokenKind.Fn) {
-      return this.parseFnExpr(true);
+    if (this.check(TokenKind.Async)) {
+      const next = this.peekAt(1)?.kind;
+      if (next === TokenKind.Fn || next === TokenKind.Function) {
+        return this.parseFnExpr(true);
+      }
     }
     return this.parseExpression();
   }
@@ -1925,10 +2114,11 @@ class Parser {
       }
       const k = this.peek().kind;
       if (k === TokenKind.Const || k === TokenKind.Let || k === TokenKind.Var ||
-          k === TokenKind.Fn || k === TokenKind.If || k === TokenKind.While ||
-          k === TokenKind.For || k === TokenKind.Match || k === TokenKind.Import ||
-          k === TokenKind.Export || k === TokenKind.Return || k === TokenKind.Class ||
-          k === TokenKind.Try) {
+          k === TokenKind.Fn || k === TokenKind.Function ||
+          k === TokenKind.If || k === TokenKind.While || k === TokenKind.Do ||
+          k === TokenKind.For || k === TokenKind.Match || k === TokenKind.Switch ||
+          k === TokenKind.Import || k === TokenKind.Export || k === TokenKind.Public ||
+          k === TokenKind.Return || k === TokenKind.Class || k === TokenKind.Try) {
         return;
       }
       this.advance();

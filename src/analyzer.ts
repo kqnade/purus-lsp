@@ -57,6 +57,11 @@ class Analyzer {
         this.visitExpr(stmt.value);
         break;
 
+      case "CompoundAssign":
+        this.visitExpr(stmt.target);
+        this.visitExpr(stmt.value);
+        break;
+
       case "FnDecl": {
         const params: ParamInfo[] = stmt.params.map((p) => ({
           name: p.name,
@@ -140,6 +145,11 @@ class Analyzer {
         this.visitBlock(stmt.body, stmt.span);
         break;
 
+      case "DoWhile":
+        this.visitBlock(stmt.body, stmt.span);
+        this.visitExpr(stmt.condition);
+        break;
+
       case "ForIn": {
         const forScope = createScope(this.currentScope, stmt.span);
         const prev = this.currentScope;
@@ -182,6 +192,21 @@ class Analyzer {
         this.visitExpr(stmt.subject);
         for (const arm of stmt.arms) {
           this.visitMatchArm(arm);
+        }
+        break;
+
+      case "Switch":
+        this.visitExpr(stmt.subject);
+        for (const c of stmt.cases) {
+          this.visitExpr(c.value);
+          if (c.body.kind === "block") {
+            this.visitBlock(c.body.stmts, c.span);
+          } else {
+            this.visitExpr(c.body.expr);
+          }
+        }
+        if (stmt.defaultBody) {
+          this.visitBlock(stmt.defaultBody, stmt.span);
         }
         break;
 
@@ -263,7 +288,7 @@ class Analyzer {
 
       case "Export":
       case "ExportDefault":
-      case "Pub":
+      case "Public":
         this.visitStmt(stmt.decl);
         break;
 
@@ -439,15 +464,26 @@ class Analyzer {
         this.visitExpr(expr.expr);
         break;
 
+      case "Yield":
+        if (expr.expr) this.visitExpr(expr.expr);
+        break;
+
+      case "Void":
+        this.visitExpr(expr.expr);
+        break;
+
       // Literals - nothing to visit
       case "IntLit":
       case "FloatLit":
+      case "BigIntLit":
       case "StrLit":
       case "RegexLit":
       case "BoolLit":
       case "NullLit":
       case "UndefinedLit":
       case "NanLit":
+      case "InfinityLit":
+      case "Blank":
       case "This":
       case "Super":
         break;

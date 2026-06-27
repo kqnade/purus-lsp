@@ -99,7 +99,7 @@ function mapToken(token: Token, rootScope: Scope): [TokenTypeIndex, TokenModifie
     case TokenKind.Require:
     case TokenKind.Use:
     case TokenKind.Namespace:
-    case TokenKind.Pub:
+    case TokenKind.Public:
     case TokenKind.All:
     case TokenKind.With:
     case TokenKind.Async:
@@ -116,6 +116,14 @@ function mapToken(token: Token, rootScope: Scope): [TokenTypeIndex, TokenModifie
     case TokenKind.Set:
     case TokenKind.Gives:
     case TokenKind.Type:
+    case TokenKind.Yield:
+    case TokenKind.Do:
+    case TokenKind.Void:
+    case TokenKind.Function:
+    case TokenKind.Protected:
+    case TokenKind.Switch:
+    case TokenKind.Case:
+    case TokenKind.Blank:
       return [typeIndex["keyword"], 0];
 
     // Operators
@@ -126,6 +134,14 @@ function mapToken(token: Token, rootScope: Scope): [TokenTypeIndex, TokenModifie
     case TokenKind.Mod:
     case TokenKind.Pow:
     case TokenKind.Neg:
+    case TokenKind.Fdiv:
+    case TokenKind.Band:
+    case TokenKind.Bor:
+    case TokenKind.Bxor:
+    case TokenKind.Bnot:
+    case TokenKind.Shl:
+    case TokenKind.Shr:
+    case TokenKind.Ushr:
     case TokenKind.Eq:
     case TokenKind.Neq:
     case TokenKind.Lt:
@@ -137,7 +153,6 @@ function mapToken(token: Token, rootScope: Scope): [TokenTypeIndex, TokenModifie
     case TokenKind.Not:
     case TokenKind.Pipe:
     case TokenKind.Coal:
-    case TokenKind.Is:
     case TokenKind.As:
     case TokenKind.Of:
     case TokenKind.Typeof:
@@ -147,6 +162,7 @@ function mapToken(token: Token, rootScope: Scope): [TokenTypeIndex, TokenModifie
     // Literals
     case TokenKind.Int:
     case TokenKind.Float:
+    case TokenKind.BigInt:
       return [typeIndex["number"], 0];
 
     case TokenKind.Str:
@@ -161,6 +177,7 @@ function mapToken(token: Token, rootScope: Scope): [TokenTypeIndex, TokenModifie
     case TokenKind.Nil:
     case TokenKind.Undefined:
     case TokenKind.Nan:
+    case TokenKind.Infinity:
       return [typeIndex["enumMember"], 0];
 
     // Comments

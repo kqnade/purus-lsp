@@ -13,15 +13,18 @@ export type Stmt =
   | ArrayDestructStmt
   | ObjectDestructStmt
   | AssignStmt
+  | CompoundAssignStmt
   | FnDeclStmt
   | ClassDeclStmt
   | IfStmt
   | UnlessStmt
   | WhileStmt
   | UntilStmt
+  | DoWhileStmt
   | ForInStmt
   | ForRangeStmt
   | MatchStmt
+  | SwitchStmt
   | TryCatchStmt
   | ThrowStmt
   | ReturnStmt
@@ -68,6 +71,17 @@ export interface ObjectDestructStmt {
 export interface AssignStmt {
   type: "Assign";
   target: Expr;
+  value: Expr;
+  span: Span;
+}
+
+export type CompoundAssignOp = "add" | "sub" | "mul" | "div" | "mod" | "pow" | "fdiv"
+  | "band" | "bor" | "bxor" | "shl" | "shr" | "ushr";
+
+export interface CompoundAssignStmt {
+  type: "CompoundAssign";
+  target: Expr;
+  op: CompoundAssignOp;
   value: Expr;
   span: Span;
 }
@@ -184,6 +198,13 @@ export interface UntilStmt {
   span: Span;
 }
 
+export interface DoWhileStmt {
+  type: "DoWhile";
+  body: Stmt[];
+  condition: Expr;
+  span: Span;
+}
+
 export interface ForInStmt {
   type: "ForIn";
   variable: string;
@@ -209,6 +230,20 @@ export interface MatchStmt {
   type: "Match";
   subject: Expr;
   arms: MatchArm[];
+  span: Span;
+}
+
+export interface SwitchCase {
+  value: Expr;
+  body: MatchArmBody;
+  span: Span;
+}
+
+export interface SwitchStmt {
+  type: "Switch";
+  subject: Expr;
+  cases: SwitchCase[];
+  defaultBody?: Stmt[];
   span: Span;
 }
 
@@ -306,7 +341,7 @@ export interface ExportDefaultStmt {
 }
 
 export interface PubStmt {
-  type: "Pub";
+  type: "Public";
   decl: Stmt;
   span: Span;
 }
@@ -351,12 +386,15 @@ export interface PostfixModifier {
 export type Expr =
   | IntLitExpr
   | FloatLitExpr
+  | BigIntLitExpr
   | StrLitExpr
   | RegexLitExpr
   | BoolLitExpr
   | NullLitExpr
   | UndefinedLitExpr
   | NanLitExpr
+  | InfinityLitExpr
+  | BlankExpr
   | IdentExpr
   | ThisExpr
   | SuperExpr
@@ -376,6 +414,8 @@ export type Expr =
   | TryExpr
   | PipeExpr
   | CoalExpr
+  | YieldExpr
+  | VoidExpr
   | IsCheckExpr
   | AsCastExpr
   | InstanceofExpr
@@ -432,6 +472,22 @@ export interface NanLitExpr {
   span: Span;
 }
 
+export interface BigIntLitExpr {
+  type: "BigIntLit";
+  value: string;
+  span: Span;
+}
+
+export interface InfinityLitExpr {
+  type: "InfinityLit";
+  span: Span;
+}
+
+export interface BlankExpr {
+  type: "Blank";
+  span: Span;
+}
+
 export interface IdentExpr {
   type: "Ident";
   name: string;
@@ -475,9 +531,10 @@ export interface RangeExpr {
 }
 
 export type BinaryOp =
-  | "add" | "sub" | "mul" | "div" | "mod" | "pow"
+  | "add" | "sub" | "mul" | "div" | "mod" | "pow" | "fdiv"
   | "eq" | "neq" | "lt" | "gt" | "le" | "ge"
-  | "and" | "or";
+  | "and" | "or"
+  | "band" | "bor" | "bxor" | "shl" | "shr" | "ushr";
 
 export interface BinOpExpr {
   type: "BinOp";
@@ -489,7 +546,7 @@ export interface BinOpExpr {
 
 export interface UnaryExpr {
   type: "Unary";
-  op: "not" | "neg";
+  op: "not" | "neg" | "bnot";
   operand: Expr;
   span: Span;
 }
@@ -576,6 +633,18 @@ export interface CoalExpr {
   type: "Coal";
   left: Expr;
   right: Expr;
+  span: Span;
+}
+
+export interface YieldExpr {
+  type: "Yield";
+  expr?: Expr;
+  span: Span;
+}
+
+export interface VoidExpr {
+  type: "Void";
+  expr: Expr;
   span: Span;
 }
 

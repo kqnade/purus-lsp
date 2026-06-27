@@ -101,7 +101,7 @@ function stmtToSymbol(stmt: Stmt): DocumentSymbol | null {
 
     case "Export":
     case "ExportDefault":
-    case "Pub":
+    case "Public":
       return stmtToSymbol(stmt.decl);
 
     default:
